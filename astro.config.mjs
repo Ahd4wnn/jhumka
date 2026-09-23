@@ -27,8 +27,10 @@ export default defineConfig({
     defaultStrategy: 'hover',
   },
   security: {
-    // Rejects cross-site form POSTs. JSON APIs are protected in src/middleware.ts.
-    checkOrigin: true,
+    // Off on purpose: behind nginx the app speaks http, so Astro's check would compare the
+    // browser's https Origin against its own http URL and reject every form post (reviews,
+    // photo uploads). src/middleware.ts does the same check against the forwarded Host instead.
+    checkOrigin: false,
   },
   server: {
     port: 4321,

@@ -55,7 +55,12 @@ export function verifyPaymentSignature(orderId: string, paymentId: string, signa
 }
 
 /** Webhook signature: HMAC-SHA256(raw request body, webhook secret). */
-export function verifyWebhookSignature(rawBody: string, signature: string, secret = requireEnv('RAZORPAY_WEBHOOK_SECRET')): boolean {
+export function verifyWebhookSignature(rawBody: string, signature: string, secret = env.RAZORPAY_WEBHOOK_SECRET): boolean {
+  // No secret configured: reject cleanly (a 400 Razorpay can read) instead of throwing a 500.
+  if (!secret) {
+    console.error('[razorpay] RAZORPAY_WEBHOOK_SECRET is not set — webhook rejected.');
+    return false;
+  }
   const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
   return safeEqualHex(expected, signature);
 }

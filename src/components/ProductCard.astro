@@ -18,7 +18,7 @@ const onSale = p.compare_at_price_inr != null && p.price_inr != null && p.compar
 ---
 
 <article
-  class="product-card group relative flex flex-col"
+  class="product-card group relative flex h-full flex-col"
   data-product
   data-collection={p.collection?.slug ?? ''}
   data-type={p.product_type}
@@ -33,11 +33,12 @@ const onSale = p.compare_at_price_inr != null && p.price_inr != null && p.compar
     </div>
   </a>
 
-  <h3 class="display mt-3 text-[1.15rem] leading-snug">
+  {/* Two lines are reserved whether the name needs them or not, so prices and buttons line up across a row. */}
+  <h3 class="display mt-3 line-clamp-2 min-h-[2.75em] text-[1.15rem] leading-snug">
     <a href={href}>{p.name}</a>
   </h3>
 
-  <div class="mt-1.5 flex items-center justify-between gap-2">
+  <div class="mt-1.5 mb-3 flex items-center justify-between gap-2">
     <p class="flex items-baseline gap-1.5 text-[0.95rem] font-medium tabular-nums">
       <span>{formatINR(p.price_inr)}</span>
       {onSale && <s class="text-xs font-normal opacity-60">{formatINR(p.compare_at_price_inr)}</s>}
@@ -56,7 +57,7 @@ const onSale = p.compare_at_price_inr != null && p.price_inr != null && p.compar
 
   <button
     type="button"
-    class="btn btn--outline btn--sm mt-3 w-full"
+    class="btn btn--outline btn--sm mt-auto w-full"
     data-add-to-cart
     data-slug={p.slug}
     data-name={p.name}

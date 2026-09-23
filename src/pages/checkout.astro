@@ -1,0 +1,129 @@
+---
+/** Guest checkout: contact → delivery → pay with Razorpay. All prices come from the server. */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { hasRazorpay } from '@/server/commerce/razorpay';
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+const paymentsReady = hasRazorpay();
+const field = 'field mt-2';
+---
+
+<BaseLayout title="Checkout" description="Complete your Jhumka order securely." noindex>
+  <section class="shell pt-10 pb-24 sm:pt-16" data-checkout data-payments-ready={paymentsReady ? '1' : '0'}>
+    <h1 class="display text-[clamp(2rem,4vw,2.75rem)]">Checkout</h1>
+
+    <!-- Empty bag -->
+    <div class="py-20 text-center" data-empty hidden>
+      <p class="display text-4xl">Your bag is empty</p>
+      <a href="/shop" class="btn mt-8">Shop the collection</a>
+    </div>
+
+    <div class="mt-8 grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:gap-14" data-body hidden>
+      <!-- Summary first on phones -->
+      <details class="acc order-first lg:hidden" data-mobile-summary>
+        <summary class="flex items-center justify-between py-4">
+          <span class="text-sm font-medium">Order summary</span>
+          <span class="tabular-nums" data-total-mobile>—</span>
+        </summary>
+        <div class="pb-6" data-summary-slot-mobile></div>
+      </details>
+
+      <form class="grid content-start gap-10" novalidate data-form>
+        <fieldset class="grid gap-5">
+          <legend class="caps eyebrow flex items-center gap-3"><span>01</span><span class="h-px w-8 bg-current opacity-60"></span><span>Contact</span></legend>
+          <label class="block">
+            <span class="text-sm font-medium">Full name</span>
+            <input name="name" autocomplete="name" required maxlength="80" class={field} />
+          </label>
+          <div class="grid gap-5 sm:grid-cols-2">
+            <label class="block">
+              <span class="text-sm font-medium">Mobile number</span>
+              <div class="relative">
+                <span class="pointer-events-none absolute top-1/2 left-4 mt-1 -translate-y-1/2 text-base">+91</span>
+                <input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" required maxlength="14" class={`${field} pl-12`} />
+              </div>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">Email <span class="font-normal opacity-70">(for your receipt)</span></span>
+              <input name="email" type="email" autocomplete="email" maxlength="160" class={field} />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="grid gap-5">
+          <legend class="caps eyebrow flex items-center gap-3"><span>02</span><span class="h-px w-8 bg-current opacity-60"></span><span>Delivery address</span></legend>
+          <label class="block">
+            <span class="text-sm font-medium">House no., building, street</span>
+            <input name="line1" autocomplete="address-line1" required maxlength="160" class={field} />
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium">Area, locality <span class="font-normal opacity-70">(optional)</span></span>
+            <input name="line2" autocomplete="address-line2" maxlength="160" class={field} />
+          </label>
+          <div class="grid gap-5 sm:grid-cols-3">
+            <label class="block">
+              <span class="text-sm font-medium">Pincode</span>
+              <input name="pincode" inputmode="numeric" autocomplete="postal-code" required maxlength="6" class={field} />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">City</span>
+              <input name="city" autocomplete="address-level2" required maxlength="80" class={field} />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">State</span>
+              <input name="state" autocomplete="address-level1" required maxlength="80" class={field} />
+            </label>
+          </div>
+          <label class="block">
+            <span class="text-sm font-medium">Landmark <span class="font-normal opacity-70">(optional)</span></span>
+            <input name="landmark" maxlength="120" class={field} />
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium">Note for us <span class="font-normal opacity-70">(optional, e.g. it’s a gift)</span></span>
+            <textarea name="note" maxlength="500" rows="3" class={`${field} h-auto py-3`}></textarea>
+          </label>
+        </fieldset>
+
+        <fieldset class="grid gap-4">
+          <legend class="caps eyebrow flex items-center gap-3"><span>03</span><span class="h-px w-8 bg-current opacity-60"></span><span>Payment</span></legend>
+          <p class="max-w-lg">Pay securely with UPI, cards, net banking or wallets. Payments are processed by Razorpay; we never see your card details.</p>
+          <p class="rounded-[10px] border border-purple-200 bg-purple-25 px-4 py-3 text-sm" role="alert" data-form-error hidden></p>
+          {!paymentsReady && <p class="rounded-[10px] border border-purple-200 bg-purple-25 px-4 py-3 text-sm">Online payments are being set up. Please check back shortly.</p>}
+          <button type="submit" class="btn btn--lg w-full sm:w-auto sm:min-w-80" data-pay disabled={!paymentsReady}>Pay securely</button>
+        </fieldset>
+      </form>
+
+      <aside class="hidden lg:block">
+        <div class="sticky top-[calc(var(--header-h)+1.5rem)] rounded-[14px] border border-purple-100 p-6" data-summary-slot></div>
+      </aside>
+    </div>
+
+    <!-- Summary template (cloned into the desktop and mobile slots) -->
+    <template data-summary-template>
+      <div>
+        <p class="text-sm font-medium">Your order</p>
+        <ul class="mt-5 divide-y divide-purple-100" data-lines></ul>
+        <div class="mt-6 flex gap-2" data-coupon-row>
+          <label class="sr-only" for="coupon">Discount code</label>
+          <input id="coupon" placeholder="Discount code" class="field h-11 flex-1 text-sm uppercase" data-coupon />
+          <button type="button" class="btn btn--outline !min-h-11 !px-4" data-apply-coupon>Apply</button>
+        </div>
+        <p class="mt-2 text-sm" data-coupon-msg hidden></p>
+        <dl class="mt-6 grid grid-cols-[1fr_auto] gap-y-2 text-sm">
+          <dt>Subtotal</dt><dd class="text-right tabular-nums" data-subtotal>—</dd>
+          <dt data-discount-label hidden>Discount</dt><dd class="text-right tabular-nums" data-discount hidden>—</dd>
+          <dt>Shipping</dt><dd class="text-right tabular-nums" data-shipping>—</dd>
+        </dl>
+        <div class="mt-4 flex items-baseline justify-between border-t border-purple-200 pt-4">
+          <span class="text-sm font-medium">Total</span>
+          <span class="text-2xl tabular-nums" data-total>—</span>
+        </div>
+        <p class="mt-2 text-xs">Prices include all taxes.</p>
+      </div>
+    </template>
+  </section>
+</BaseLayout>
+
+<script>
+  import '@/scripts/checkout';
+</script>

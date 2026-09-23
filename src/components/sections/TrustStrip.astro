@@ -1,0 +1,42 @@
+---
+/** Four short reassurances, straight from the store's own settings — no claims we can't keep. */
+import { hasDatabase } from '@/server/db/client';
+import { getSettings } from '@/server/settings';
+import { formatINR } from '@/lib/format';
+
+const shipping = hasDatabase() ? (await getSettings()).shipping : null;
+const freeAbove = shipping?.freeAbovePaise ? formatINR(shipping.freeAbovePaise / 100) : null;
+
+const items = [
+  { label: 'Secure payments', sub: 'UPI, cards, net banking', icon: 'lock' },
+  { label: 'Ships across India', sub: 'Tracked delivery', icon: 'box' },
+  freeAbove ? { label: `Free shipping above ${freeAbove}`, sub: 'On every order', icon: 'truck' } : { label: 'Gold-plated finish', sub: 'Made to be worn daily', icon: 'sparkle' },
+  { label: 'Real reviews', sub: 'From verified buyers', icon: 'star' },
+];
+
+const paths: Record<string, string> = {
+  lock: 'M7 10V7.5a5 5 0 0 1 10 0V10M5.5 10h13v10h-13z',
+  box: 'M12 3 3.5 7.5v9L12 21l8.5-4.5v-9zM3.5 7.5 12 12l8.5-4.5M12 12v9',
+  truck: 'M3 7h11v9H3zM14 10h4l3 3v3h-7M7 19.5a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2M17.5 19.5a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2',
+  sparkle: 'M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7L4.5 11 10.1 9z',
+  star: 'M12 3.8l2.6 5.3 5.9.7-4.3 4 1.1 5.8L12 16.9 6.7 19.6l1.1-5.8-4.3-4 5.9-.7z',
+};
+---
+
+<section class="border-y border-purple-100 bg-purple-25" aria-label="Why shop with Jhumka">
+  <ul class="shell grid grid-cols-2 gap-x-6 gap-y-5 py-6 lg:grid-cols-4 lg:py-7">
+    {
+      items.map((it) => (
+        <li class="flex items-start gap-3">
+          <svg viewBox="0 0 24 24" class="mt-0.5 size-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <path d={paths[it.icon]} />
+          </svg>
+          <span class="min-w-0">
+            <span class="block text-sm leading-snug font-medium">{it.label}</span>
+            <span class="mt-0.5 block text-xs opacity-70">{it.sub}</span>
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+</section>

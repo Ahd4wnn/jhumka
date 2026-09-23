@@ -1,0 +1,79 @@
+---
+import Logo from './Logo.astro';
+import MeshTile from './MeshTile.astro';
+import { NAV, SITE } from '@/config/site';
+import { getCollections } from '@/lib/catalog';
+import { hasDatabase } from '@/server/db/client';
+import { getSettings } from '@/server/settings';
+
+const collections = (await getCollections()).slice(0, 8);
+// Business details live in Admin → Settings; without a database (first-run dev) we skip them.
+const business = hasDatabase() ? (await getSettings()).business : null;
+const phone = SITE.contactPhone.replace(/^91(\d{5})(\d{5})$/, '+91 $1 $2');
+const year = new Date().getFullYear();
+---
+
+<footer>
+  <MeshTile seed="footer" tone="dusk" class="text-white" as="section">
+    <div class="shell pt-16 pb-8 sm:pt-20">
+      <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.1fr]">
+        <div>
+          <p class="display text-[clamp(1.9rem,3vw,2.5rem)] leading-tight">
+            Jewellery, <span class="accent">made to be</span> remembered.
+          </p>
+          <p class="mt-4 max-w-sm text-sm text-white/90">{SITE.bio}</p>
+          <a href={SITE.instagramUrl} target="_blank" rel="noopener" class="btn btn--white btn--sm mt-6">Follow @{SITE.handle}</a>
+        </div>
+
+        <nav aria-label="Footer">
+          <p class="caps text-white">Explore</p>
+          <ul class="mt-4 space-y-2.5 text-sm">
+            {NAV.map((n) => <li><a class="hover:underline hover:underline-offset-4" href={n.href}>{n.label}</a></li>)}
+            <li><a class="hover:underline hover:underline-offset-4" href="/shop">All pieces</a></li>
+          </ul>
+        </nav>
+
+        <div>
+          <p class="caps text-white">Collections</p>
+          <ul class="mt-4 space-y-2.5 text-sm">
+            {collections.map((c) => <li><a class="hover:underline hover:underline-offset-4" href={`/collections/${c.slug}/`}>{c.name}</a></li>)}
+          </ul>
+        </div>
+
+        <div>
+          <p class="caps text-white">Help</p>
+          <ul class="mt-4 space-y-2.5 text-sm">
+            <li><button type="button" class="hover:underline hover:underline-offset-4" data-open-bag>Your bag</button></li>
+            <li><a class="hover:underline hover:underline-offset-4" href="/track">Track your order</a></li>
+            <li><a class="hover:underline hover:underline-offset-4" href="/#faq">FAQ &amp; care</a></li>
+            <li><a class="hover:underline hover:underline-offset-4" href="/contact">Contact us</a></li>
+          </ul>
+
+          <p class="caps mt-8 text-white">Contact</p>
+          <address class="mt-4 space-y-2.5 text-sm not-italic">
+            <a class="block hover:underline hover:underline-offset-4" href={`tel:+${SITE.contactPhone}`}>{phone}</a>
+            {business?.email && <a class="block break-all hover:underline hover:underline-offset-4" href={`mailto:${business.email}`}>{business.email}</a>}
+            {business?.address && <span class="block whitespace-pre-line text-white/90">{business.address}</span>}
+          </address>
+        </div>
+      </div>
+
+      <div class="mt-16 flex justify-center" aria-hidden="true">
+        <Logo class="text-[clamp(3rem,12vw,9rem)] leading-none opacity-90" height="clamp(3rem, 10vw, 7rem)" tone="white" />
+      </div>
+
+      <nav class="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/25 pt-6 text-xs text-white/90" aria-label="Policies">
+        <a class="hover:underline hover:underline-offset-4" href="/policies/terms/">Terms &amp; conditions</a>
+        <a class="hover:underline hover:underline-offset-4" href="/policies/privacy/">Privacy policy</a>
+        <a class="hover:underline hover:underline-offset-4" href="/policies/refunds/">Refunds &amp; cancellations</a>
+        <a class="hover:underline hover:underline-offset-4" href="/policies/shipping/">Shipping &amp; delivery</a>
+        <a class="hover:underline hover:underline-offset-4" href="/contact/">Contact us</a>
+      </nav>
+
+      <div class="mt-5 flex flex-col justify-between gap-3 text-xs text-white/90 sm:flex-row">
+        <p>© {year} {SITE.name}. All rights reserved.</p>
+        <p>Secure payments · UPI, cards, net banking and wallets</p>
+      </div>
+    </div>
+  </MeshTile>
+</footer>

@@ -1,0 +1,8 @@
+# /etc/systemd/system/jhumka-backup.service
+[Unit]
+Description=Jhumka database + photo backup
+
+[Service]
+Type=oneshot
+User=jhumka
+ExecStart=/opt/jhumka/deploy/backup.sh

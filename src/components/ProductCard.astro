@@ -1,0 +1,69 @@
+---
+import ProductImage from './ProductImage.astro';
+import { formatINR } from '@/lib/format';
+import { STOCK_LABELS, type CatalogProduct } from '@/lib/types';
+
+interface Props {
+  product: CatalogProduct;
+  index?: number;
+  sizes?: string;
+  /** Shared-element morph into the product page (only one card per product per page). */
+  morph?: boolean;
+  eager?: boolean;
+}
+const { product: p, index = 0, sizes, morph = true, eager = false } = Astro.props;
+const soldOut = p.stock_status === 'sold_out';
+const href = `/products/${p.slug}/`;
+const onSale = p.compare_at_price_inr != null && p.price_inr != null && p.compare_at_price_inr > p.price_inr;
+---
+
+<article
+  class="product-card group relative flex flex-col"
+  data-product
+  data-collection={p.collection?.slug ?? ''}
+  data-type={p.product_type}
+  data-price={p.price_inr ?? ''}
+  data-order={index}
+  data-reveal
+>
+  <a href={href} class="block" aria-label={p.name}>
+    <div class="media relative aspect-[4/5] overflow-hidden rounded-[14px]" transition:name={morph ? `product-${p.slug}` : undefined}>
+      <ProductImage product={p} sizes={sizes} hoverSwap eager={eager} class="absolute inset-0 transition-transform duration-700 ease-[var(--ease-silk)] group-hover:scale-[1.04]" />
+      {p.stock_status !== 'in_stock' && <span class="tile-label absolute top-2.5 left-2.5 !px-2.5 !py-1 !text-[0.62rem]">{STOCK_LABELS[p.stock_status]}</span>}
+    </div>
+  </a>
+
+  <h3 class="display mt-3 text-[1.15rem] leading-snug">
+    <a href={href}>{p.name}</a>
+  </h3>
+
+  <div class="mt-1.5 flex items-center justify-between gap-2">
+    <p class="flex items-baseline gap-1.5 text-[0.95rem] font-medium tabular-nums">
+      <span>{formatINR(p.price_inr)}</span>
+      {onSale && <s class="text-xs font-normal opacity-60">{formatINR(p.compare_at_price_inr)}</s>}
+    </p>
+    {
+      p.rating && (
+        <span class="inline-flex items-center gap-1 text-xs opacity-80" aria-label={`Rated ${p.rating.average.toFixed(1)} out of 5 from ${p.rating.count} reviews`}>
+          <svg viewBox="0 0 24 24" class="size-3" fill="currentColor" aria-hidden="true">
+            <path d="M12 2.6l2.84 5.94 6.53.78-4.8 4.5 1.24 6.47L12 17.13 6.19 20.29l1.24-6.47-4.8-4.5 6.53-.78z" />
+          </svg>
+          <span aria-hidden="true">{p.rating.average.toFixed(1)}</span>
+        </span>
+      )
+    }
+  </div>
+
+  <button
+    type="button"
+    class="btn btn--outline btn--sm mt-3 w-full"
+    data-add-to-cart
+    data-slug={p.slug}
+    data-name={p.name}
+    data-price={p.price_inr ?? ''}
+    disabled={soldOut}
+    aria-label={soldOut ? `${p.name} is sold out` : `Add ${p.name} to bag`}
+  >
+    {soldOut ? 'Sold out' : 'Add to bag'}
+  </button>
+</article>

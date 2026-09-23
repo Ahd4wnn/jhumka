@@ -1,0 +1,67 @@
+---
+import '@fontsource/instrument-serif/latin-400.css';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource-variable/instrument-sans/wght.css';
+import '@/styles/global.css';
+
+import displayWoff2 from '@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2?url';
+import sansWoff2 from '@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url';
+
+import { ClientRouter } from 'astro:transitions';
+import Seo from '@/components/Seo.astro';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import CartDrawer from '@/components/CartDrawer.astro';
+import SearchDialog from '@/components/SearchDialog.astro';
+import { SITE } from '@/config/site';
+import type { JsonLd } from '@/lib/seo';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string | null;
+  imageAlt?: string;
+  type?: 'website' | 'product' | 'article';
+  noindex?: boolean;
+  jsonLd?: JsonLd[];
+  price?: number | null;
+}
+
+const seo = Astro.props;
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#7D46AB" />
+    <meta name="color-scheme" content="light" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" href={displayWoff2} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={sansWoff2} as="font" type="font/woff2" crossorigin />
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
+    <Seo {...seo} />
+    <ClientRouter fallback="swap" />
+  </head>
+  <body class="min-h-dvh">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-purple focus:px-5 focus:py-3 focus:text-white">Skip to content</a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+    <CartDrawer />
+    <SearchDialog />
+    <div id="toast" class="toast" role="status" aria-live="polite" transition:persist="toast"></div>
+    <script>
+      import '@/scripts/site';
+      import '@/scripts/motion';
+    </script>
+  </body>
+</html>

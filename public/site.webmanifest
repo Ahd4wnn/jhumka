@@ -1,0 +1,8 @@
+{
+  "name": "Jhumka",
+  "short_name": "Jhumka",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }],
+  "theme_color": "#7D46AB",
+  "background_color": "#FFFFFF",
+  "display": "browser"
+}

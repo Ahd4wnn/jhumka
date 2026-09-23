@@ -1,0 +1,32 @@
+---
+import { FAQS, SITE } from '@/config/site';
+
+const phone = SITE.contactPhone.replace(/^91(\d{5})(\d{5})$/, '+91 $1 $2');
+---
+
+<section id="faq" class="section border-t border-purple-100" aria-labelledby="faq-title">
+  <div class="shell mx-auto max-w-3xl">
+    <p class="caps eyebrow text-center" data-reveal>Good to know</p>
+    <h2 id="faq-title" class="section-title text-center" data-reveal>
+      Questions, <span class="accent">answered</span>
+    </h2>
+
+    <div class="mt-9 grid gap-3">
+      {
+        FAQS.map((f) => (
+          <details class="acc" name="faq" data-reveal>
+            <summary class="flex items-center justify-between gap-6 py-4 font-medium">
+              {f.q}
+              <span class="acc__icon relative size-3.5 shrink-0" aria-hidden="true" />
+            </summary>
+            <p class="pb-5 text-[0.95rem]">{f.a}</p>
+          </details>
+        ))
+      }
+    </div>
+
+    <p class="mt-9 text-center text-sm" data-reveal>
+      Something else on your mind? Call us on <a class="underline underline-offset-4" href={`tel:+${SITE.contactPhone}`}>{phone}</a>.
+    </p>
+  </div>
+</section>

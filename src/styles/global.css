@@ -1,0 +1,411 @@
+@import 'tailwindcss';
+
+/*
+ * Jhumka design system — "The Purple Room".
+ * Two colours only: #7D46AB and #FFFFFF. Every other value is a tonal mix of that purple
+ * (toward white or black, in oklab), never a second hue. Gold only ever comes from the
+ * jewellery in the photographs.
+ */
+
+@theme {
+  --color-purple: #7d46ab;
+  --color-white: #ffffff;
+  /* tonal steps of the one purple */
+  --color-purple-25: color-mix(in oklab, #7d46ab 4%, #fff);
+  --color-purple-50: color-mix(in oklab, #7d46ab 8%, #fff);
+  --color-purple-100: color-mix(in oklab, #7d46ab 16%, #fff);
+  --color-purple-200: color-mix(in oklab, #7d46ab 30%, #fff);
+  --color-purple-300: color-mix(in oklab, #7d46ab 48%, #fff);
+  --color-purple-400: color-mix(in oklab, #7d46ab 72%, #fff);
+  --color-purple-600: color-mix(in oklab, #7d46ab 86%, #000);
+  --color-purple-700: color-mix(in oklab, #7d46ab 70%, #000);
+  --color-purple-800: color-mix(in oklab, #7d46ab 52%, #000);
+  --color-purple-900: color-mix(in oklab, #7d46ab 36%, #000);
+
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-accent: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Instrument Sans Variable', 'Segoe UI', system-ui, sans-serif;
+
+  --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Softly rounded, flat surfaces: separation comes from hairline borders, not shadows. */
+  --radius-card: 14px;
+  --radius-control: 12px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+  /* The one shadow, for things that float above the page (drawer, sticky bars, search). */
+  --shadow-float: 0 8px 30px color-mix(in oklab, #7d46ab 14%, transparent);
+}
+
+/* ───────────────────────── Base ───────────────────────── */
+@layer base {
+  :root {
+    color-scheme: light;
+    --gutter: clamp(1.25rem, 4vw, 3.5rem);
+    --bar-h: 2rem;
+    /* Vertical rhythm between sections. */
+    --section-y: clamp(3rem, 6vw, 5.5rem);
+    --header-h: 4rem;
+    /* Pointed (Persian / Mughal) arch — the single structural signature of the brand. */
+    --arch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 400' preserveAspectRatio='none'%3E%3Cpath d='M0 400V150C0 92 58 52 108 30C128 21 144 10 150 0C156 10 172 21 192 30C242 52 300 92 300 150V400Z'/%3E%3C/svg%3E");
+    --grain: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+  }
+
+  body {
+    background: var(--color-white);
+    color: var(--color-purple);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: var(--color-purple);
+    color: var(--color-white);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-purple);
+    outline-offset: 3px;
+  }
+
+  h1, h2, h3, h4 {
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  p { text-wrap: pretty; }
+  img, svg, video { display: block; max-width: 100%; }
+  summary { list-style: none; cursor: pointer; }
+  summary::-webkit-details-marker { display: none; }
+}
+
+/* ───────────────────────── Components ───────────────────────── */
+@layer components {
+  .shell {
+    width: 100%;
+    max-width: 90rem;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  /* Type roles */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+  }
+  .accent {
+    font-family: var(--font-accent);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .caps {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  /*
+   * Mesh gradient (the f13s method): four radial colour fields pinned near the corners,
+   * blended in oklab, a light wash and a fine soft-light grain. Anchors (--a1..--a4)
+   * are seeded per product/collection so every tile is unique but stays in family.
+   */
+  .mesh {
+    --a1: 14% 10%;
+    --a2: 88% 18%;
+    --a3: 18% 90%;
+    --a4: 86% 84%;
+    --wash: 0.08;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      linear-gradient(rgb(255 255 255 / var(--wash)), rgb(255 255 255 / var(--wash))),
+      radial-gradient(80% 70% at var(--a1) in oklab, var(--c1), transparent 58%),
+      radial-gradient(80% 70% at var(--a2) in oklab, var(--c2), transparent 58%),
+      radial-gradient(90% 80% at var(--a3) in oklab, var(--c3), transparent 60%),
+      radial-gradient(100% 85% at var(--a4) in oklab, var(--c4), transparent 62%),
+      var(--c0, var(--c1));
+  }
+  .mesh::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: var(--grain);
+    background-size: 160px 160px;
+    mix-blend-mode: soft-light;
+    opacity: var(--grain-opacity, 0.35);
+  }
+  .mesh > *, .mesh > picture > img { position: relative; z-index: 1; }
+
+  /* Velvet: the Instagram bust backdrop — purple with a lit top and deep corners. */
+  .mesh--velvet {
+    --c0: #7d46ab;
+    --c1: color-mix(in oklab, #7d46ab 55%, #fff);
+    --c2: #7d46ab;
+    --c3: color-mix(in oklab, #7d46ab 55%, #000);
+    --c4: color-mix(in oklab, #7d46ab 80%, #000);
+  }
+  /* Mist: near-white sections with a faint purple bloom. */
+  .mesh--mist {
+    --c0: #ffffff;
+    --c1: color-mix(in oklab, #7d46ab 10%, #fff);
+    --c2: #ffffff;
+    --c3: color-mix(in oklab, #7d46ab 16%, #fff);
+    --c4: color-mix(in oklab, #7d46ab 6%, #fff);
+    --grain-opacity: 0.2;
+  }
+  /* Dusk: the footer / deep panels. */
+  .mesh--dusk {
+    --c0: #7d46ab;
+    --c1: #7d46ab;
+    --c2: color-mix(in oklab, #7d46ab 62%, #000);
+    --c3: color-mix(in oklab, #7d46ab 86%, #fff);
+    --c4: color-mix(in oklab, #7d46ab 78%, #000);
+  }
+
+  .arch {
+    -webkit-mask: var(--arch) center bottom / 100% 100% no-repeat;
+    mask: var(--arch) center bottom / 100% 100% no-repeat;
+  }
+
+  /* Accordion rows (FAQ, product details) */
+  .acc {
+    border: 1px solid var(--color-purple-100);
+    border-radius: var(--radius-control);
+    padding-inline: 1.25rem;
+  }
+  .acc[open] { background: var(--color-purple-25); }
+  .acc__icon::before,
+  .acc__icon::after {
+    content: '';
+    position: absolute;
+    inset: 50% 0 auto;
+    height: 1px;
+    background: currentColor;
+    transition: transform 0.35s var(--ease-silk);
+  }
+  .acc__icon::after { transform: rotate(90deg); }
+  .acc[open] .acc__icon::after { transform: rotate(0deg); }
+
+  /* Sticky buy bar (phones, product page) */
+  .buy-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 45;
+    padding: 0.7rem var(--gutter) max(0.7rem, env(safe-area-inset-bottom));
+    background: color-mix(in oklab, #fff 94%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--color-purple-100);
+    box-shadow: var(--shadow-float);
+    transform: translateY(110%);
+    transition: transform 0.35s var(--ease-silk);
+  }
+  .buy-bar.is-on { transform: none; }
+
+  /* Section rhythm */
+  .section { padding-block: var(--section-y); }
+  .section--tight { padding-block: clamp(2rem, 4vw, 3rem); }
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: clamp(1.5rem, 2.5vw, 2.25rem);
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+  .eyebrow { margin-bottom: 0.75rem; }
+
+  /* Surfaces */
+  .card {
+    background: var(--color-white);
+    border: 1px solid var(--color-purple-100);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+  /* Frosted caption pill over a photo (category tiles, badges on images). */
+  .tile-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-pill);
+    background: color-mix(in oklab, #fff 85%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--color-purple);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  /* Horizontal snap row (product rails on phones). */
+  .rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+  /* Form controls */
+  .field {
+    width: 100%;
+    height: 3rem;
+    padding-inline: 0.9rem;
+    border: 1px solid var(--color-purple-200);
+    border-radius: var(--radius-input);
+    background: var(--color-white);
+    color: var(--color-purple);
+    font-size: 0.95rem;
+  }
+  .field::placeholder { color: color-mix(in oklab, #7d46ab 45%, #fff); }
+  .field:focus { border-color: var(--color-purple); outline: none; box-shadow: 0 0 0 3px var(--color-purple-100); }
+  .field[aria-invalid='true'] { border-color: var(--color-purple); background: var(--color-purple-25); }
+  textarea.field { height: auto; padding-block: 0.7rem; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-purple-50);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 3rem;
+    padding: 0.8rem 1.5rem;
+    border: 1px solid var(--color-purple);
+    border-radius: var(--radius-control);
+    background: var(--color-purple);
+    color: var(--color-white);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: background-color 0.35s var(--ease-silk), color 0.35s var(--ease-silk), transform 0.35s var(--ease-silk);
+  }
+  .btn--lg { min-height: 3.25rem; padding-inline: 1.75rem; }
+  .btn--sm { min-height: 2.6rem; padding: 0.5rem 1rem; font-size: 0.72rem; }
+  .btn--pill { border-radius: var(--radius-pill); }
+  .btn:hover { background: var(--color-purple-700); border-color: var(--color-purple-700); }
+  .btn:active { transform: scale(0.985); }
+  .btn--outline { background: transparent; color: var(--color-purple); }
+  .btn--outline:hover { background: var(--color-purple); border-color: var(--color-purple); color: var(--color-white); }
+  .btn--white { background: var(--color-white); border-color: var(--color-white); color: var(--color-purple); }
+  .btn--white:hover { background: var(--color-purple-50); border-color: var(--color-purple-50); }
+  .btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid currentColor;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: gap 0.35s var(--ease-silk);
+  }
+  .link-arrow:hover { gap: 0.8rem; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0.4rem 1.1rem;
+    border: 1px solid var(--color-purple-200);
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    transition: border-color 0.25s, background-color 0.25s, color 0.25s;
+  }
+  .chip:hover { border-color: var(--color-purple); }
+  .chip[aria-pressed='true'] { background: var(--color-purple); border-color: var(--color-purple); color: var(--color-white); }
+
+  /* Initial states for GSAP reveals (src/scripts/motion.ts) — hidden only when JS runs. */
+  .js [data-reveal]:not(.is-in) {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+
+  .toast {
+    position: fixed;
+    border-radius: var(--radius-pill);
+    left: 50%;
+    bottom: max(1.25rem, env(safe-area-inset-bottom));
+    z-index: 90;
+    max-width: min(92vw, 30rem);
+    padding: 0.95rem 1.5rem;
+    background: var(--color-purple);
+    color: var(--color-white);
+    font-size: 0.875rem;
+    text-align: center;
+    transform: translate(-50%, 180%);
+    transition: transform 0.6s var(--ease-silk);
+    pointer-events: none;
+  }
+  .toast.is-on { transform: translate(-50%, 0); }
+  .toast:empty { display: none; }
+
+  html.is-locked { overflow: hidden; }
+
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+  .js [data-reveal] { opacity: 1; transform: none; }
+}

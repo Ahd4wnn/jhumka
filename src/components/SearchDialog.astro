@@ -1,0 +1,135 @@
+---
+/**
+ * Header search. The whole (small) catalogue is rendered server-side and filtered in the browser,
+ * so there is no API call and it works the moment the dialog opens. Falls back to /shop without JS.
+ */
+import Photo from './Photo.astro';
+import { getProducts } from '@/lib/catalog';
+import { formatINR } from '@/lib/format';
+import { resolveImage } from '@/lib/images';
+import { TYPE_LABELS } from '@/lib/types';
+
+const products = await getProducts();
+---
+
+<dialog id="search" class="search-dialog" data-lenis-prevent aria-label="Search pieces" transition:persist="search">
+  <div class="search-panel card">
+    <form class="flex items-center gap-2 border-b border-purple-100 px-4" action="/shop" method="get" data-search-form>
+      <svg viewBox="0 0 24 24" class="size-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.5 4.5"></path>
+      </svg>
+      <input
+        type="search"
+        name="q"
+        class="h-14 min-w-0 flex-1 bg-transparent text-base focus:outline-none"
+        placeholder="Search necklaces, bracelets…"
+        aria-label="Search pieces"
+        autocomplete="off"
+        autofocus
+        data-search-input
+      />
+      <button type="button" class="caps shrink-0 px-2 !text-[0.62rem]" data-close-dialog>Close</button>
+    </form>
+
+    <ul class="max-h-[min(60svh,26rem)] overflow-y-auto p-2" data-search-results>
+      {
+        products.map((p) => {
+          const img = resolveImage(p.images[0]?.path, p.images[0]);
+          const terms = `${p.name} ${p.collection?.name ?? ''} ${TYPE_LABELS[p.product_type]}`.toLowerCase();
+          return (
+            <li data-search-item data-terms={terms}>
+              <a href={`/products/${p.slug}/`} class="flex items-center gap-3 rounded-[10px] p-2 hover:bg-purple-50" data-close-dialog>
+                <span class="relative size-12 shrink-0 overflow-hidden rounded-[8px] bg-purple-50">
+                  {img && <Photo src={img} alt="" sizes="48px" class="absolute inset-0 size-full object-cover" />}
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-medium">{p.name}</span>
+                  <span class="block truncate text-xs opacity-70">
+                    {p.collection?.name ?? TYPE_LABELS[p.product_type]}
+                  </span>
+                </span>
+                <span class="shrink-0 text-sm tabular-nums">{formatINR(p.price_inr)}</span>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
+
+    <p class="px-5 py-10 text-center text-sm" data-search-empty hidden>
+      No pieces match. <a href="/shop" class="underline underline-offset-4">Browse everything</a>
+    </p>
+  </div>
+</dialog>
+
+<style>
+  .search-dialog {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: calc(var(--header-h) + 0.75rem) 0.75rem 0;
+    border: 0;
+    background: transparent;
+  }
+  .search-dialog::backdrop {
+    background: color-mix(in oklab, var(--color-purple) 35%, transparent);
+    backdrop-filter: blur(2px);
+  }
+  .search-panel {
+    width: min(38rem, 100%);
+    margin-inline: auto;
+    box-shadow: var(--shadow-float);
+  }
+  .search-dialog[open] .search-panel {
+    animation: search-in 0.3s var(--ease-silk);
+  }
+  @keyframes search-in {
+    from {
+      opacity: 0;
+      transform: translateY(-0.75rem);
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const dialog = document.querySelector<HTMLDialogElement>('#search');
+    if (!dialog || dialog.dataset.ready) return;
+    dialog.dataset.ready = '1';
+    const input = dialog.querySelector<HTMLInputElement>('[data-search-input]')!;
+    const items = [...dialog.querySelectorAll<HTMLElement>('[data-search-item]')];
+    const empty = dialog.querySelector<HTMLElement>('[data-search-empty]')!;
+    const LIMIT = 8;
+
+    const filter = () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const li of items) {
+        const hit = !q || (li.dataset.terms ?? '').includes(q);
+        li.hidden = !hit || shown >= LIMIT;
+        if (hit) shown++;
+      }
+      empty.hidden = shown > 0;
+    };
+    input.addEventListener('input', filter);
+    filter();
+
+    // Up/down move through the results; Enter opens the focused one (or the first match).
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && !(e.key === 'Enter' && e.target === input)) return;
+      const links = [...dialog.querySelectorAll<HTMLAnchorElement>('[data-search-item]:not([hidden]) a')];
+      if (!links.length) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        links[0].click();
+        return;
+      }
+      e.preventDefault();
+      const at = links.indexOf(document.activeElement as HTMLAnchorElement);
+      const next = e.key === 'ArrowDown' ? at + 1 : at - 1;
+      if (next < 0) input.focus();
+      else links[Math.min(next, links.length - 1)].focus();
+    });
+  });
+</script>

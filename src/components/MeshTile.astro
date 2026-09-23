@@ -1,0 +1,17 @@
+---
+/** A seeded mesh surface. Wrap images or text in it. */
+import { meshAnchors } from '@/lib/mesh';
+
+interface Props {
+  seed: string;
+  tone?: 'velvet' | 'mist' | 'dusk';
+  tall?: boolean;
+  class?: string;
+  as?: 'div' | 'section' | 'figure';
+}
+const { seed, tone = 'velvet', tall = false, class: cls, as: Tag = 'div' } = Astro.props;
+---
+
+<Tag class:list={['mesh', `mesh--${tone}`, cls]} style={meshAnchors(seed, tall)}>
+  <slot />
+</Tag>

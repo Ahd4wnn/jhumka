@@ -1,0 +1,32 @@
+---
+/**
+ * Jhumka admin + CRM (React app; routes are handled client-side under /admin/*).
+ * Private: noindex, never cached, blocked in robots.txt. Installable as a home-screen app.
+ */
+import '@fontsource/instrument-serif/latin-400.css';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource-variable/instrument-sans/wght.css';
+import '@/styles/global.css';
+import AdminApp from '@/admin/AdminApp';
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<!doctype html>
+<html lang="en-IN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#7D46AB" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Jhumka" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/admin-192.png" />
+    <link rel="manifest" href="/admin.webmanifest" />
+    <title>Jhumka admin</title>
+  </head>
+  <body class="bg-white">
+    <AdminApp client:only="react" />
+  </body>
+</html>

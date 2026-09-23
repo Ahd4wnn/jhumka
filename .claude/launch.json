@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jhumka-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "4321",
+        "--host",
+        "127.0.0.1"
+      ],
+      "port": 4321
+    },
+    {
+      "name": "jhumka-redesign-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "node_modules/.cache/rd-demo/serve.mjs"
+      ],
+      "port": 4400
+    }
+  ]
+}

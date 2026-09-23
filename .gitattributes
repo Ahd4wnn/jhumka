@@ -1,0 +1,5 @@
+* text=auto
+# Server scripts and config must keep Unix line endings.
+*.sh text eol=lf
+deploy/* text eol=lf
+*.sql text eol=lf

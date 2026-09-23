@@ -1,0 +1,203 @@
+---
+/** Reviews on a product page: rating summary, customer photos, the reviews, and a photo viewer. */
+import Photo from './Photo.astro';
+import Stars from './Stars.astro';
+import { resolveImage } from '@/lib/images';
+import { mediaUrl } from '@/lib/media';
+import type { PublicReview, ReviewSummary } from '@/server/reviews';
+
+interface Props {
+  slug: string;
+  summary: ReviewSummary;
+  reviews: PublicReview[];
+}
+const { slug, summary, reviews } = Astro.props;
+const INITIAL = 6;
+const writeHref = `/track?review=${encodeURIComponent(slug)}`;
+const date = (d: Date) => new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+const photos = reviews.flatMap((r) => r.images.map((im) => ({ ...im, author: r.authorName })));
+const photoIndex = new Map(photos.map((p, i) => [p.path, i]));
+---
+
+{
+  summary.count === 0 ? (
+    <section id="reviews" class="section border-t border-purple-100" aria-labelledby="reviews-title">
+      <div class="shell flex flex-wrap items-end justify-between gap-8">
+        <div>
+          <p class="caps">Reviews</p>
+          <h2 id="reviews-title" class="section-title mt-3">
+            Worn &amp; <span class="accent">loved</span>
+          </h2>
+          <p class="mt-4 max-w-md">No reviews yet. Bought this piece? Tell us how you wear it, and add a photo if you like.</p>
+        </div>
+        <a href={writeHref} class="btn btn--outline">Write a review</a>
+      </div>
+    </section>
+  ) : (
+    <section id="reviews" class="section scroll-mt-[var(--header-h)] border-t border-purple-100" aria-labelledby="reviews-title" data-reviews>
+      <div class="shell grid gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-24">
+        <div class="lg:sticky lg:top-[calc(var(--header-h)+2rem)] lg:self-start">
+          <p class="caps">Reviews</p>
+          <h2 id="reviews-title" class="section-title mt-3">
+            Worn &amp; <span class="accent">loved</span>
+          </h2>
+          <div class="mt-10 flex items-end gap-4">
+            <span class="display text-7xl leading-[0.8] tabular-nums">{summary.average.toFixed(1)}</span>
+            <span>
+              <Stars rating={summary.average} class="h-4" />
+              <span class="mt-2 block text-sm">
+                {summary.count} review{summary.count === 1 ? '' : 's'}
+              </span>
+            </span>
+          </div>
+          <ol class="mt-8 grid max-w-xs gap-2.5 text-sm" aria-label="Ratings breakdown">
+            {[5, 4, 3, 2, 1].map((star) => {
+              const n = summary.distribution[star - 1];
+              return (
+                <li class="grid grid-cols-[2.25rem_1fr_1.5rem] items-center gap-3">
+                  <span class="tabular-nums">{star} ★</span>
+                  <span class="h-1.5 rounded-full bg-purple-100" aria-hidden="true">
+                    <span class="block h-full rounded-full bg-purple" style={`width:${(n / summary.count) * 100}%`} />
+                  </span>
+                  <span class="text-right tabular-nums">
+                    {n}
+                    <span class="sr-only"> reviews with {star} stars</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          <a href={writeHref} class="btn btn--outline mt-10">Write a review</a>
+          <p class="mt-4 max-w-xs text-sm">Every review comes from someone who bought this piece.</p>
+        </div>
+
+        <div>
+          {photos.length > 0 && (
+            <div class="mb-12">
+              <h3 class="caps">Customer photos</h3>
+              <ul class="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                {photos.slice(0, 12).map((ph, i) => (
+                  <li>
+                    <button type="button" class="group relative block aspect-square w-full overflow-hidden rounded-[10px] bg-purple-50" data-review-photo={i} aria-label={`Open photo from ${ph.author}`}>
+                      <Photo src={resolveImage(ph.path, ph)!} alt="" sizes="140px" class="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <ul class="divide-y divide-purple-100 border-y border-purple-100">
+            {reviews.map((r, i) => (
+              <li class="py-8" hidden={i >= INITIAL} data-review-item>
+                <article>
+                  <div class="flex items-center justify-between gap-4">
+                    <Stars rating={r.rating} label={`${r.rating} out of 5 stars`} />
+                    <time class="text-sm" datetime={r.createdAt.toISOString()}>
+                      {date(r.createdAt)}
+                    </time>
+                  </div>
+                  {r.title && <h3 class="display mt-3 text-xl leading-tight sm:text-2xl">{r.title}</h3>}
+                  <p class="mt-3 max-w-2xl leading-relaxed whitespace-pre-line">{r.body}</p>
+                  {r.images.length > 0 && (
+                    <ul class="mt-5 flex flex-wrap gap-2">
+                      {r.images.map((im) => (
+                        <li>
+                          <button type="button" class="group relative block size-20 overflow-hidden rounded-[10px] bg-purple-50 sm:size-24" data-review-photo={photoIndex.get(im.path)} aria-label={`Open photo from ${r.authorName}`}>
+                            <Photo src={resolveImage(im.path, im)!} alt="" sizes="96px" class="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p class="caps mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 !text-[0.62rem]">
+                    <span>{r.authorName}</span>
+                    <span class="size-1 rounded-full bg-purple" aria-hidden="true" />
+                    <span>Verified buyer</span>
+                  </p>
+                  {r.reply && (
+                    <div class="mt-5 border-l border-purple-300 pl-4">
+                      <p class="caps !text-[0.62rem]">Reply from Jhumka</p>
+                      <p class="mt-2 text-sm leading-relaxed whitespace-pre-line">{r.reply}</p>
+                    </div>
+                  )}
+                </article>
+              </li>
+            ))}
+          </ul>
+          {reviews.length > INITIAL && (
+            <button type="button" class="btn btn--outline mt-8" data-more-reviews>
+              Show all {reviews.length} reviews
+            </button>
+          )}
+        </div>
+      </div>
+
+      {photos.length > 0 && (
+        <dialog class="review-viewer m-auto w-[min(60rem,calc(100vw-1.5rem))] overflow-hidden rounded-[18px] bg-white p-0 text-purple" data-review-viewer data-lenis-prevent aria-label="Customer photo">
+          <figure>
+            <div class="grid h-[min(78svh,52rem)] place-items-center bg-purple-50">
+              <img data-viewer-img alt="" class="max-h-full max-w-full object-contain" />
+            </div>
+            <figcaption class="flex items-center justify-between gap-4 px-5 py-4 text-sm">
+              <span data-viewer-caption />
+              <span class="flex items-center gap-1">
+                <button type="button" class="grid size-10 place-items-center hover:bg-purple-50" data-viewer-step="-1" aria-label="Previous photo">←</button>
+                <button type="button" class="grid size-10 place-items-center hover:bg-purple-50" data-viewer-step="1" aria-label="Next photo">→</button>
+                <button type="button" class="caps ml-2 h-10 px-3 hover:bg-purple-50" data-viewer-close>Close</button>
+              </span>
+            </figcaption>
+          </figure>
+          <script type="application/json" data-viewer-photos set:html={JSON.stringify(photos.map((p) => ({ src: mediaUrl(p.path, 1600, 'webp'), author: p.author }))).replace(/</g, '\\u003c')} />
+        </dialog>
+      )}
+    </section>
+  )
+}
+
+<style>
+  .review-viewer::backdrop {
+    background: color-mix(in oklab, var(--color-purple) 55%, transparent);
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const root = document.querySelector<HTMLElement>('[data-reviews]');
+    if (!root || root.dataset.ready) return;
+    root.dataset.ready = '1';
+
+    root.querySelector('[data-more-reviews]')?.addEventListener('click', (e) => {
+      root.querySelectorAll<HTMLElement>('[data-review-item][hidden]').forEach((li) => (li.hidden = false));
+      (e.currentTarget as HTMLElement).remove();
+    });
+
+    const viewer = root.querySelector<HTMLDialogElement>('[data-review-viewer]');
+    if (!viewer) return;
+    const photos: { src: string; author: string }[] = JSON.parse(viewer.querySelector('[data-viewer-photos]')!.textContent || '[]');
+    const img = viewer.querySelector<HTMLImageElement>('[data-viewer-img]')!;
+    const caption = viewer.querySelector<HTMLElement>('[data-viewer-caption]')!;
+    let at = 0;
+    const show = (i: number) => {
+      at = (i + photos.length) % photos.length;
+      img.src = photos[at].src;
+      caption.textContent = `Photo by ${photos[at].author} · ${at + 1} of ${photos.length}`;
+    };
+    viewer.querySelectorAll<HTMLElement>('[data-viewer-step]').forEach((b) => {
+      b.hidden = photos.length < 2;
+      b.addEventListener('click', () => show(at + Number(b.dataset.viewerStep)));
+    });
+    viewer.querySelector('[data-viewer-close]')!.addEventListener('click', () => viewer.close());
+    viewer.addEventListener('click', (e) => e.target === viewer && viewer.close());
+    viewer.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') show(at + 1);
+      if (e.key === 'ArrowLeft') show(at - 1);
+    });
+    root.querySelectorAll<HTMLElement>('[data-review-photo]').forEach((b) =>
+      b.addEventListener('click', () => {
+        show(Number(b.dataset.reviewPhoto));
+        viewer.showModal();
+      }),
+    );
+  });
+</script>

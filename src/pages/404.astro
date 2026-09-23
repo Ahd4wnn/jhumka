@@ -1,0 +1,21 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import CategoryTiles from '@/components/sections/CategoryTiles.astro';
+import { getCollections, getProducts } from '@/lib/catalog';
+
+const [collections, products] = await Promise.all([getCollections(), getProducts()]);
+---
+
+<BaseLayout title="Page not found" description="This page could not be found. Explore the Jhumka collection of gold-plated necklaces, bracelets and rings instead." noindex>
+  <section class="shell py-16 text-center sm:py-24">
+    <p class="caps eyebrow">404</p>
+    <h1 class="display text-[clamp(2.25rem,4.5vw,3.5rem)]">This piece <span class="accent">is</span> missing</h1>
+    <p class="mx-auto mt-4 max-w-md">The page you were looking for has moved, or never existed.</p>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <a href="/shop" class="btn btn--lg">Shop the collection</a>
+      <a href="/" class="btn btn--outline btn--lg">Home</a>
+    </div>
+  </section>
+
+  <CategoryTiles collections={collections} products={products} title="Start here instead" limit={4} class="border-t border-purple-100" />
+</BaseLayout>

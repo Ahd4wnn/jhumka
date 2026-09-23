@@ -1,0 +1,79 @@
+---
+/**
+ * Shared layout for the policy pages Razorpay (and customers) expect: a readable column of text
+ * with the shop's real contact details underneath. Anything the owner still has to decide is
+ * written as a [TO CONFIRM] placeholder so it is obvious before this goes live.
+ */
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { SITE } from '@/config/site';
+import { hasDatabase } from '@/server/db/client';
+import { getSettings } from '@/server/settings';
+import { cachePublicPage } from '@/server/http';
+
+interface Props {
+  title: string;
+  description: string;
+  updated?: string;
+}
+const { title, description, updated = 'September 2026' } = Astro.props;
+const business = hasDatabase() ? (await getSettings()).business : null;
+const phone = SITE.contactPhone.replace(/^91(\d{5})(\d{5})$/, '+91 $1 $2');
+cachePublicPage(Astro.response);
+---
+
+<BaseLayout title={title} description={description}>
+  <section class="section">
+    <div class="shell mx-auto max-w-3xl">
+      <p class="caps eyebrow">Policies</p>
+      <h1 class="display text-[clamp(2rem,4vw,2.75rem)]">{title}</h1>
+      <p class="mt-3 text-sm opacity-80">Last updated: {updated}</p>
+
+      <div class="policy mt-8">
+        <slot />
+      </div>
+
+      <div class="mt-12 rounded-[14px] border border-purple-100 p-5 text-sm">
+        <p class="font-medium">Contact us</p>
+        <address class="mt-2 grid gap-1 not-italic">
+          <span>{business?.legalName || SITE.name}</span>
+          {business?.address ? <span class="whitespace-pre-line">{business.address}</span> : <span class="opacity-70">[TO CONFIRM: full business address]</span>}
+          <a class="underline underline-offset-4" href={`tel:+${SITE.contactPhone}`}>{phone}</a>
+          {business?.email ? (
+            <a class="underline underline-offset-4" href={`mailto:${business.email}`}>{business.email}</a>
+          ) : (
+            <span class="opacity-70">[TO CONFIRM: support email address]</span>
+          )}
+        </address>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .policy :global(h2) {
+    margin-top: 2rem;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    line-height: 1.2;
+  }
+  .policy :global(p),
+  .policy :global(ul) {
+    margin-top: 0.85rem;
+  }
+  .policy :global(ul) {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+  .policy :global(li) {
+    margin-top: 0.35rem;
+  }
+  .policy :global(strong) {
+    font-weight: 500;
+  }
+  /* Anything still to be decided stands out until it is replaced. */
+  .policy :global(.todo) {
+    background: var(--color-purple-50);
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+  }
+</style>

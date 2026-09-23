@@ -1,0 +1,71 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+Astro.response.headers.set('Cache-Control', 'no-store');
+const field = 'field';
+// "Write a review" on a product page lands here first: find the order, then review from it.
+const review = /^[a-z0-9-]{1,120}$/.test(Astro.url.searchParams.get('review') ?? '') ? Astro.url.searchParams.get('review')! : '';
+---
+
+<BaseLayout
+  title={review ? 'Review a piece' : 'Track your order'}
+  description="Check the status of your Jhumka order with your order number and phone."
+  noindex
+>
+  <section class="shell grid min-h-[60svh] content-center py-14 sm:py-20">
+    <div class="mx-auto w-full max-w-md rounded-[18px] border border-purple-100 p-6 sm:p-8">
+      <p class="caps">{review ? 'Write a review' : 'Track order'}</p>
+      {
+        review ? (
+          <h1 class="display mt-3 text-[clamp(2rem,4vw,2.75rem)]">
+            Loved <span class="accent">your</span> piece?
+          </h1>
+        ) : (
+          <h1 class="display mt-3 text-[clamp(2rem,4vw,2.75rem)]">
+            Where’s <span class="accent">my</span> order?
+          </h1>
+        )
+      }
+      {
+        review && (
+          <p class="mt-4 text-sm">
+            Reviews come from customers who bought the piece. Enter your order number and the mobile number you used at checkout, and we will take you straight to
+            the review form.
+          </p>
+        )
+      }
+      <form class="mt-7 grid gap-5" novalidate data-track data-review={review}>
+        <label class="block">
+          <span class="text-sm font-medium">Order number</span>
+          <input name="number" placeholder="JH-10001" required class={`${field} uppercase`} />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">Mobile number used at checkout</span>
+          <input name="phone" type="tel" inputmode="numeric" required class={field} />
+        </label>
+        <p class="text-sm" role="alert" data-error hidden></p>
+        <button class="btn btn--lg w-full">{review ? 'Continue' : 'Find my order'}</button>
+      </form>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const form = document.querySelector<HTMLFormElement>('[data-track]');
+    if (!form || form.dataset.ready) return;
+    form.dataset.ready = '1';
+    const error = form.querySelector<HTMLElement>('[data-error]')!;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      const res = await fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.redirect) {
+        const review = form.dataset.review;
+        return location.assign(review ? `${body.redirect}&review=${encodeURIComponent(review)}` : body.redirect);
+      }
+      error.hidden = false;
+      error.textContent = body.error ?? 'We could not find that order.';
+    });
+  });
+</script>

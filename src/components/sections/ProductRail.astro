@@ -1,0 +1,59 @@
+---
+/** A row of pieces: scroll-snap rail on phones, an even grid from `sm` up. */
+import ProductCard from '@/components/ProductCard.astro';
+import type { CatalogProduct } from '@/lib/types';
+
+interface Props {
+  title: string;
+  sub?: string;
+  products: CatalogProduct[];
+  href?: string;
+  hrefLabel?: string;
+  id?: string;
+  /** Turn off the shared-element morph when another card for the same piece is on the page. */
+  morph?: boolean;
+  class?: string;
+}
+const { title, sub, products, href, hrefLabel = 'View all', id, morph = true, class: cls } = Astro.props;
+const titleId = `${(id ?? title).toLowerCase().replace(/[^a-z0-9]+/g, '-')}-title`;
+---
+
+{
+  products.length > 0 && (
+    <section id={id} class:list={['section', cls]} aria-labelledby={titleId}>
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <h2 id={titleId} class="section-title" data-reveal>
+              {title}
+            </h2>
+            {sub && <p class="mt-2 max-w-md text-sm opacity-80" data-reveal>{sub}</p>}
+          </div>
+          {href && (
+            <a href={href} class="shrink-0 text-sm underline underline-offset-4 hover:no-underline" data-reveal>
+              {hrefLabel} <span aria-hidden="true">→</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Phones: a snap rail with a peek at the next card. */}
+      <ul class="rail sm:hidden" style="padding-inline: var(--gutter)">
+        {products.map((p, i) => (
+          <li class="w-[60vw] max-w-[15rem]">
+            <ProductCard product={p} index={i} morph={false} sizes="60vw" />
+          </li>
+        ))}
+      </ul>
+
+      {/* Tablet and up: an even grid that never stretches a lone card across the page. */}
+      <ul class="shell hidden gap-x-4 gap-y-9 sm:grid" style="grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr))">
+        {products.map((p, i) => (
+          <li>
+            <ProductCard product={p} index={i} morph={morph} sizes="(min-width: 1024px) 23vw, 30vw" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

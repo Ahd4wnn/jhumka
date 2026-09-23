@@ -1,0 +1,62 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Banner from '@/components/sections/Banner.astro';
+import TrustStrip from '@/components/sections/TrustStrip.astro';
+import CategoryTiles from '@/components/sections/CategoryTiles.astro';
+import ProductRail from '@/components/sections/ProductRail.astro';
+import Editorial from '@/components/sections/Editorial.astro';
+import ReviewsStrip from '@/components/sections/ReviewsStrip.astro';
+import InstagramGrid from '@/components/sections/InstagramGrid.astro';
+import Faq from '@/components/sections/Faq.astro';
+import { getCollections, getFeaturedProducts, getProducts } from '@/lib/catalog';
+import { getImage } from 'astro:assets';
+import { heroImage, lifestylePhotos, resolveImage, type ResolvedImage } from '@/lib/images';
+import { cachePublicPage } from '@/server/http';
+import { faqLd, itemListLd, organizationLd, websiteLd } from '@/lib/seo';
+import { SITE } from '@/config/site';
+
+const [collections, products, featured] = await Promise.all([getCollections(), getProducts(), getFeaturedProducts(8)]);
+const site = Astro.site!;
+cachePublicPage(Astro.response);
+
+// Photography: the dedicated hero image (src/assets/hero), then lifestyle shots, then product photos.
+const lifestyle = lifestylePhotos();
+const productPhotos = products.flatMap((p) => p.images.map((im) => resolveImage(im.path, im))).filter(Boolean) as ResolvedImage[];
+const pool = [...lifestyle, ...productPhotos];
+const hero = heroImage();
+const heroPhoto = hero ?? pool[0] ?? null;
+const storyPhoto = (hero ? pool[0] : (pool[1] ?? pool[0])) ?? null;
+// Link previews (WhatsApp, Instagram, Google) show the hero banner.
+const ogImage = hero ? (await getImage({ src: hero, width: 1200, format: 'jpg' })).src : undefined;
+const igPhotos = [...productPhotos, ...lifestyle].slice(0, 6);
+
+const newest = [...products].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 4);
+const bestSellers = featured.slice(0, 4);
+const newestOnly = newest.filter((p) => !bestSellers.some((b) => b.id === p.id));
+---
+
+<BaseLayout
+  description={SITE.description}
+  image={ogImage}
+  imageAlt="Jhumka necklaces on purple velvet busts: Heartfelt Elegance"
+  jsonLd={[organizationLd(site), websiteLd(site), faqLd(), itemListLd(site, 'Featured jewellery', featured)]}
+>
+  <Banner
+    photo={heroPhoto}
+    photoAlt={hero
+      ? 'Four Jhumka gold-plated necklaces on purple velvet busts, with the words Heartfelt Elegance: necklaces that speak the language of your heart'
+      : 'Jhumka jewellery'}
+    photoClass={hero ? 'object-[62%_18%]' : undefined}
+    eyebrow="Handpicked jewellery"
+    title="Your story, <span class='accent'>styled by</span> Jhumka"
+    sub={SITE.bio}
+  />
+  <TrustStrip />
+  <CategoryTiles id="collections" collections={collections} products={products} title="Shop by category" sub="Necklaces, bracelets and everyday pieces, grouped the way you wear them." />
+  <ProductRail title="Loved right now" sub="The pieces customers keep reaching for." products={bestSellers} href="/shop" />
+  {newestOnly.length > 0 && <ProductRail title="New in" products={newestOnly} href="/shop" morph={false} />}
+  <Editorial photo={storyPhoto} photoAlt="Wearing Jhumka jewellery" />
+  <ReviewsStrip />
+  <InstagramGrid photos={igPhotos} />
+  <Faq />
+</BaseLayout>

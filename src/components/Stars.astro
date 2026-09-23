@@ -1,0 +1,21 @@
+---
+/** Star rating, 0–5 (fractions shown as a partly filled star). Size it with a height class. */
+interface Props {
+  rating: number;
+  class?: string;
+  label?: string;
+}
+const { rating, class: cls = 'h-3.5', label = `Rated ${rating.toFixed(1)} out of 5` } = Astro.props;
+const pct = Math.max(0, Math.min(100, (rating / 5) * 100));
+const star = 'M12 2.6l2.84 5.94 6.53.78-4.8 4.5 1.24 6.47L12 17.13 6.19 20.29l1.24-6.47-4.8-4.5 6.53-.78z';
+const row = [0, 1, 2, 3, 4];
+---
+
+<span class:list={['relative inline-flex shrink-0 align-middle', cls]} role="img" aria-label={label}>
+  <span class="flex h-full gap-[0.15em] text-purple-200" aria-hidden="true">
+    {row.map(() => <svg viewBox="0 0 24 24" class="aspect-square h-full shrink-0" fill="currentColor"><path d={star} /></svg>)}
+  </span>
+  <span class="absolute inset-y-0 left-0 flex h-full gap-[0.15em] overflow-hidden text-purple" style={`width:${pct}%`} aria-hidden="true">
+    {row.map(() => <svg viewBox="0 0 24 24" class="aspect-square h-full shrink-0" fill="currentColor"><path d={star} /></svg>)}
+  </span>
+</span>

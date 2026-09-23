@@ -1,0 +1,22 @@
+# /etc/caddy/Caddyfile — replace jhumka.in with your domain (DNS A/AAAA records must point here).
+# Caddy gets and renews the HTTPS certificate automatically.
+jhumka.in, www.jhumka.in {
+	encode zstd gzip
+
+	# Product photos straight from disk (MEDIA_DIR=/var/lib/jhumka/media).
+	handle /media/* {
+		root * /var/lib/jhumka
+		file_server
+		header Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	# Everything else: the Node server (storefront, checkout, admin, Razorpay webhook).
+	handle {
+		reverse_proxy 127.0.0.1:4321
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}

@@ -1,0 +1,45 @@
+---
+/**
+ * Responsive photo for either a bundled asset (optimised by Astro <Image>) or an uploaded
+ * photo from /media, which already exists as AVIF + WebP at 480/960/1600 px.
+ * The <picture> is `display: contents`: it only offers the formats and must never become the
+ * <img>'s layout box (inside a positioned parent it would collapse the photo to 0×0).
+ */
+import { Image } from 'astro:assets';
+import { isMedia, type ResolvedImage } from '@/lib/images';
+import { mediaSrcset, mediaUrl } from '@/lib/media';
+
+interface Props {
+  src: ResolvedImage;
+  alt: string;
+  widths?: number[];
+  sizes?: string;
+  loading?: 'lazy' | 'eager';
+  fetchpriority?: 'high' | 'low' | 'auto';
+  class?: string;
+  draggable?: 'true' | 'false';
+  [key: `data-${string}`]: unknown;
+}
+const { src, alt, loading = 'lazy', widths, sizes = '100vw', class: cls, ...rest } = Astro.props;
+---
+
+{
+  isMedia(src) ? (
+    <picture class="contents">
+      <source type="image/avif" srcset={mediaSrcset(src.path, 'avif')} sizes={sizes} />
+      <source type="image/webp" srcset={mediaSrcset(src.path, 'webp')} sizes={sizes} />
+      <img
+        src={mediaUrl(src.path, 960, 'webp')}
+        alt={alt}
+        width={src.w}
+        height={src.h}
+        loading={loading}
+        decoding="async"
+        class={cls}
+        {...rest}
+      />
+    </picture>
+  ) : (
+    <Image src={src} alt={alt} widths={widths} sizes={sizes} loading={loading} decoding="async" class={cls} {...rest} />
+  )
+}

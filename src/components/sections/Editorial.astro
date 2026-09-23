@@ -1,0 +1,42 @@
+---
+/** The brand story: a photograph beside the text, with the arch motif kept small. */
+import Photo from '@/components/Photo.astro';
+import MeshTile from '../MeshTile.astro';
+import type { ResolvedImage } from '@/lib/images';
+
+interface Props {
+  photo: ResolvedImage | null;
+  photoAlt: string;
+}
+const { photo, photoAlt } = Astro.props;
+---
+
+<section id="story" class="section" aria-labelledby="story-title">
+  <div class="shell grid items-center gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
+    <div class="relative mx-auto aspect-[4/5] w-full max-w-[34rem] overflow-hidden rounded-[18px] bg-purple-50 sm:aspect-[16/10] lg:aspect-[4/5] lg:max-h-[32rem]">
+      {
+        photo ? (
+          <Photo src={photo} alt={photoAlt} widths={[640, 960, 1280]} sizes="(min-width: 1024px) 45vw, 100vw" class="absolute inset-0 size-full object-cover" />
+        ) : (
+          <MeshTile seed="story" tone="velvet" tall class="absolute inset-0" />
+        )
+      }
+    </div>
+
+    <div data-reveal>
+      <p class="caps eyebrow flex items-center gap-2">
+        <span class="arch inline-block h-5 w-3.5 bg-purple" aria-hidden="true"></span>
+        Our story
+      </p>
+      <h2 id="story-title" class="section-title">
+        Jewellery, <span class="accent">made to be</span> remembered.
+      </h2>
+      <p class="mt-5 max-w-md">
+        Jhumka began with a simple wish: that the pieces you wear every day should feel like keepsakes. Fine chains, warm gold and small symbols — an infinity, a
+        tulip, a crescent moon — chosen to carry a little of your story wherever you go.
+      </p>
+      <p class="mt-3 max-w-md">Every piece is handpicked, checked by us, and packed to be given or kept.</p>
+      <a href="/shop" class="btn btn--outline mt-8">Shop the collection</a>
+    </div>
+  </div>
+</section>

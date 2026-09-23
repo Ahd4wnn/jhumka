@@ -1,0 +1,79 @@
+---
+/**
+ * Category grid: one square tile per collection, with the name and piece count over the photo.
+ * Collections with nothing published in them are left out, so no tile leads to an empty page.
+ */
+import Photo from '@/components/Photo.astro';
+import MeshTile from '@/components/MeshTile.astro';
+import { resolveImage } from '@/lib/images';
+import type { CatalogProduct, Collection } from '@/lib/types';
+
+interface Props {
+  collections: Collection[];
+  products: CatalogProduct[];
+  title?: string;
+  sub?: string;
+  id?: string;
+  limit?: number;
+  /** Show collections even when they have nothing published yet. */
+  includeEmpty?: boolean;
+  class?: string;
+}
+const { collections, products, title = 'Shop by category', sub, id, limit, includeEmpty = false, class: cls } = Astro.props;
+
+const counted = collections
+  .map((c) => ({ collection: c, items: products.filter((p) => p.collection_id === c.id) }))
+  .filter((x) => includeEmpty || x.items.length > 0);
+const list = limit ? counted.slice(0, limit) : counted;
+const titleId = `${id ?? 'categories'}-title`;
+---
+
+{
+  list.length >= 2 && (
+    <section id={id} class:list={['section', cls]} aria-labelledby={titleId}>
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <h2 id={titleId} class="section-title" data-reveal>
+              {title}
+            </h2>
+            {sub && <p class="mt-2 max-w-md text-sm opacity-80" data-reveal>{sub}</p>}
+          </div>
+          <a href="/shop" class="hidden shrink-0 text-sm underline underline-offset-4 hover:no-underline sm:block" data-reveal>
+            All pieces <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+          {list.map(({ collection: c, items }) => {
+            const cover = c.cover_path ?? items.find((p) => p.images[0])?.images[0]?.path ?? null;
+            const img = resolveImage(cover);
+            return (
+              <li data-reveal>
+                <a href={`/collections/${c.slug}/`} class="group relative block aspect-square overflow-hidden rounded-[14px] bg-purple-50">
+                  {img ? (
+                    <Photo
+                      src={img}
+                      alt=""
+                      sizes="(min-width: 1024px) 23vw, 46vw"
+                      class="absolute inset-0 size-full object-cover transition-transform duration-700 ease-[var(--ease-silk)] group-hover:scale-[1.04]"
+                    />
+                  ) : (
+                    <MeshTile seed={c.slug} tone="velvet" class="absolute inset-0" />
+                  )}
+                  <span class="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-purple-900/80 to-transparent" aria-hidden="true" />
+                  <span class="absolute inset-x-3 bottom-3 text-white sm:inset-x-4 sm:bottom-4">
+                    <span class="block truncate text-[0.95rem] leading-tight font-medium">{c.name}</span>
+                    <span class="mt-0.5 block text-xs opacity-85">
+                      {items.length} {items.length === 1 ? 'piece' : 'pieces'}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
+  )
+}

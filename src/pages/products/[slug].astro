@@ -1,0 +1,221 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProductImage from '@/components/ProductImage.astro';
+import ProductRail from '@/components/sections/ProductRail.astro';
+import ProductReviews from '@/components/ProductReviews.astro';
+import Stars from '@/components/Stars.astro';
+import { getProducts, relatedProducts } from '@/lib/catalog';
+import { cachePublicPage } from '@/server/http';
+import { productReviews } from '@/server/reviews';
+import { formatINR } from '@/lib/format';
+import { imagePublicUrl, resolveImage } from '@/lib/images';
+import { breadcrumbLd, metaDescription, productLd } from '@/lib/seo';
+import { STOCK_LABELS, TYPE_LABELS, type CatalogProduct } from '@/lib/types';
+
+const all = await getProducts();
+const found = all.find((x) => x.slug === Astro.params.slug);
+if (!found) return Astro.rewrite('/404');
+const p: CatalogProduct = found;
+cachePublicPage(Astro.response);
+const site = Astro.site!;
+const soldOut = p.stock_status === 'sold_out';
+const related = relatedProducts(p, all, 4);
+const reviews = await productReviews(p.id);
+const { summary } = reviews;
+const typeWord = TYPE_LABELS[p.product_type].toLowerCase().replace(/s$/, '');
+const description = metaDescription(
+  [
+    p.short_description || p.description,
+    `${p.name} by Jhumka: a ${(p.material ?? 'gold-plated').toLowerCase()} ${typeWord}${p.price_inr != null ? ` for ${formatINR(p.price_inr)}` : ''}.`,
+    'Handpicked by Jhumka, for every version of you.',
+  ]
+    .filter(Boolean)
+    .join(' '),
+);
+const first = resolveImage(p.images[0]?.path);
+const ogImage = imagePublicUrl(first);
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Shop', path: '/shop/' },
+  ...(p.collection ? [{ name: p.collection.name, path: `/collections/${p.collection.slug}/` }] : []),
+  { name: p.name, path: `/products/${p.slug}/` },
+];
+const gallery = p.images.length > 1 ? p.images.map((_, i) => i) : [0];
+// With an odd number of photos the first one spans both columns, so the grid always fills.
+const wideFirst = gallery.length % 2 === 1;
+---
+
+<BaseLayout
+  title={p.name}
+  description={description}
+  image={ogImage}
+  imageAlt={p.images[0]?.alt || p.name}
+  type="product"
+  price={p.price_inr}
+  jsonLd={[productLd(site, p, reviews), breadcrumbLd(site, crumbs)]}
+>
+  <nav aria-label="Breadcrumb" class="shell pt-5">
+    <ol class="caps flex flex-wrap gap-2 !text-[0.62rem]">
+      {
+        crumbs.map((c, i) => (
+          <li class="flex items-center gap-2">
+            {i < crumbs.length - 1 ? <a href={c.path} class="hover:underline hover:underline-offset-4">{c.name}</a> : <span aria-current="page">{c.name}</span>}
+            {i < crumbs.length - 1 && <span aria-hidden="true">/</span>}
+          </li>
+        ))
+      }
+    </ol>
+  </nav>
+
+  <div class="shell grid gap-8 pt-6 pb-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
+    <!-- Gallery -->
+    <div class="grid gap-3 sm:grid-cols-2">
+      {
+        gallery.map((i) => (
+          <div
+            class:list={['relative aspect-[4/5] overflow-hidden rounded-[14px] bg-purple-50', i === 0 && wideFirst && 'sm:col-span-2']}
+            transition:name={i === 0 ? `product-${p.slug}` : undefined}
+          >
+            <ProductImage product={p} index={i} eager={i === 0} sizes={i === 0 ? '(min-width: 1024px) 55vw, 100vw' : '(min-width: 1024px) 27vw, 50vw'} class="absolute inset-0" />
+          </div>
+        ))
+      }
+    </div>
+
+    <!-- Details -->
+    <div class="lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:self-start">
+      {p.collection && <a href={`/collections/${p.collection.slug}/`} class="caps hover:underline hover:underline-offset-4">{p.collection.name}</a>}
+      <h1 class="display mt-3 text-[clamp(2rem,3.4vw,2.75rem)] leading-tight">{p.name}</h1>
+      <p class="mt-4 flex items-baseline gap-3 text-2xl font-medium tabular-nums">
+        <span>{formatINR(p.price_inr)}</span>
+        {p.compare_at_price_inr != null && p.price_inr != null && p.compare_at_price_inr > p.price_inr && <s class="text-lg">{formatINR(p.compare_at_price_inr)}</s>}
+      </p>
+      <p class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <span class="flex items-center gap-2">
+          <span class:list={['size-2 rounded-full', soldOut ? 'border border-purple' : 'bg-purple']} aria-hidden="true"></span>
+          {STOCK_LABELS[p.stock_status]}
+        </span>
+        {
+          summary.count > 0 && (
+            <a href="#reviews" class="flex items-center gap-2 hover:underline hover:underline-offset-4">
+              <Stars rating={summary.average} class="h-3" />
+              {summary.average.toFixed(1)} · {summary.count} review{summary.count === 1 ? '' : 's'}
+            </a>
+          )
+        }
+      </p>
+
+      {p.short_description && <p class="mt-6 max-w-md leading-relaxed">{p.short_description}</p>}
+
+      <div class="mt-7 flex items-center gap-3" data-buy-row>
+        <label for="qty" class="sr-only">Quantity</label>
+        <div class="inline-flex h-12 items-center rounded-[999px] border border-purple-200">
+          <button type="button" class="grid h-full w-11 place-items-center rounded-l-[999px] hover:bg-purple-50" aria-label="Decrease quantity" data-qty-step="-1">−</button>
+          <input id="qty" type="number" inputmode="numeric" min="1" max="10" value="1" class="h-full w-10 bg-transparent text-center tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none" />
+          <button type="button" class="grid h-full w-11 place-items-center rounded-r-[999px] hover:bg-purple-50" aria-label="Increase quantity" data-qty-step="1">+</button>
+        </div>
+        <button
+          type="button"
+          class="btn btn--lg flex-1"
+          data-add-to-cart
+          data-open-bag
+          data-slug={p.slug}
+          data-name={p.name}
+          data-price={p.price_inr ?? ''}
+          data-qty-from="#qty"
+          disabled={soldOut}
+        >
+          {soldOut ? 'Sold out' : 'Add to bag'}
+        </button>
+      </div>
+      {
+        !soldOut && (
+          <button
+            type="button"
+            class="btn btn--outline btn--lg mt-3 w-full"
+            data-buy-now
+            data-slug={p.slug}
+            data-name={p.name}
+            data-price={p.price_inr ?? ''}
+            data-qty-from="#qty"
+          >
+            Buy now
+          </button>
+        )
+      }
+
+      <div class="mt-8 grid gap-2.5">
+        <details class="acc" open>
+          <summary class="flex items-center justify-between gap-6 py-4 font-medium">Details <span class="acc__icon relative size-3.5 shrink-0" aria-hidden="true" /></summary>
+          <div class="pb-5">
+            {p.description && <p class="mb-4">{p.description}</p>}
+            <dl class="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
+              <dt>Type</dt><dd>{TYPE_LABELS[p.product_type].replace(/s$/, '')}</dd>
+              {p.material && (<><dt>Finish</dt><dd>{p.material}</dd></>)}
+              {p.collection && (<><dt>Collection</dt><dd>{p.collection.name}</dd></>)}
+            </dl>
+          </div>
+        </details>
+        <details class="acc">
+          <summary class="flex items-center justify-between gap-6 py-4 font-medium">Care <span class="acc__icon relative size-3.5 shrink-0" aria-hidden="true" /></summary>
+          <p class="pb-5 text-[0.95rem]">Put your jewellery on last and take it off first. Keep it away from perfume, lotions and water, wipe it with a soft dry cloth, and store each piece separately.</p>
+        </details>
+        <details class="acc">
+          <summary class="flex items-center justify-between gap-6 py-4 font-medium">Delivery &amp; payment <span class="acc__icon relative size-3.5 shrink-0" aria-hidden="true" /></summary>
+          <p class="pb-5 text-[0.95rem]">Pay securely online with UPI, cards, net banking or wallets. Your order is confirmed instantly, and tracking details appear on your order page once it ships.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <ProductReviews slug={p.slug} summary={summary} reviews={reviews.reviews} />
+
+  <ProductRail title="You may also love" products={related} href="/shop" class="border-t border-purple-100" />
+
+  {/* Phones: the buy button follows you down the page. */}
+  {
+    !soldOut && (
+      <div class="buy-bar lg:hidden" data-buy-bar>
+        <div class="flex items-center gap-3">
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-medium">{p.name}</span>
+            <span class="block text-sm tabular-nums">{formatINR(p.price_inr)}</span>
+          </span>
+          <button
+            type="button"
+            class="btn shrink-0"
+            data-add-to-cart
+            data-open-bag
+            data-slug={p.slug}
+            data-name={p.name}
+            data-price={p.price_inr ?? ''}
+            data-qty-from="#qty"
+          >
+            Add to bag
+          </button>
+        </div>
+      </div>
+    )
+  }
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const qty = document.querySelector<HTMLInputElement>('#qty');
+    if (!qty) return;
+    document.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const next = Math.max(1, Math.min(10, (Number(qty.value) || 1) + Number(b.dataset.qtyStep)));
+        qty.value = String(next);
+      }),
+    );
+
+    // The sticky bar appears once the main Add to bag button has scrolled away.
+    const bar = document.querySelector<HTMLElement>('[data-buy-bar]');
+    const row = document.querySelector<HTMLElement>('[data-buy-row]');
+    if (!bar || !row) return;
+    const io = new IntersectionObserver(([e]) => bar.classList.toggle('is-on', !e.isIntersecting), { rootMargin: '-10% 0px 0px 0px' });
+    io.observe(row);
+    document.addEventListener('astro:before-swap', () => io.disconnect(), { once: true });
+  });
+</script>

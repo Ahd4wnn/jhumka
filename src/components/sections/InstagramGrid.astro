@@ -1,0 +1,77 @@
+---
+/**
+ * "Follow the story": the latest Instagram posts (synced by src/server/instagram.ts), each linking
+ * to the post. Until Instagram is connected it falls back to shop photos. Tiles come in whole rows
+ * (3 on phones, 6 on desktop) so the strip never ends in a gap; with fewer than 3 it is hidden.
+ */
+import Photo from '@/components/Photo.astro';
+import { resolveImage, type ResolvedImage } from '@/lib/images';
+import { getInstagramFeed } from '@/server/instagram';
+import { SITE } from '@/config/site';
+
+interface Props {
+  photos: ResolvedImage[];
+}
+interface Tile {
+  src: ResolvedImage;
+  href: string;
+  label: string;
+  kind?: string;
+}
+
+const posts = await getInstagramFeed(6);
+const firstLine = (caption: string | null) => caption?.split('\n')[0].trim().slice(0, 120) || '';
+const all: Tile[] =
+  posts.length >= 3
+    ? posts.map((p, i) => ({
+        src: resolveImage(p.image.path, p.image)!,
+        href: p.permalink,
+        label: firstLine(p.caption) ? `Instagram post: ${firstLine(p.caption)}` : `Jhumka on Instagram, post ${i + 1}`,
+        kind: p.mediaType,
+      }))
+    : Astro.props.photos.map((src, i) => ({ src, href: SITE.instagramUrl, label: `Jhumka on Instagram, photo ${i + 1}` }));
+const tiles = all.slice(0, all.length >= 6 ? 6 : all.length >= 3 ? 3 : 0);
+---
+
+<section class="section" aria-labelledby="ig-title">
+  <div class="shell text-center">
+    <p class="caps eyebrow" data-reveal>Follow the story</p>
+    <h2 id="ig-title" class="section-title" data-reveal>
+      <a href={SITE.instagramUrl} target="_blank" rel="noopener">@{SITE.handle}</a>
+    </h2>
+    <p class="mx-auto mt-4 max-w-md text-sm opacity-80" data-reveal>New drops, reviews and giveaways land on Instagram first.</p>
+  </div>
+  {
+    tiles.length > 0 && (
+      <ul class:list={['shell mt-9 grid grid-cols-3 gap-2 lg:gap-3', tiles.length === 6 && 'lg:grid-cols-6']}>
+        {tiles.map((t) => (
+          <li data-reveal>
+            <a href={t.href} target="_blank" rel="noopener" class="group relative block aspect-square overflow-hidden rounded-[12px] bg-purple-50" aria-label={t.label}>
+              <Photo
+                src={t.src}
+                alt=""
+                widths={[320, 480, 640]}
+                sizes={tiles.length === 6 ? '(min-width: 1024px) 17vw, 33vw' : '33vw'}
+                class="absolute inset-0 size-full object-cover transition-transform duration-1000 group-hover:scale-105"
+              />
+              {t.kind === 'VIDEO' && (
+                <svg viewBox="0 0 24 24" class="absolute top-3 right-3 size-5 text-white drop-shadow" fill="currentColor" aria-hidden="true">
+                  <path d="M8 5.5v13l10.5-6.5z" />
+                </svg>
+              )}
+              {t.kind === 'CAROUSEL_ALBUM' && (
+                <svg viewBox="0 0 24 24" class="absolute top-3 right-3 size-5 text-white drop-shadow" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <rect x="7.5" y="3.5" width="13" height="13" rx="1" />
+                  <path d="M16.5 20.5h-12a1 1 0 0 1-1-1v-12" />
+                </svg>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  <div class="mt-9 text-center">
+    <a href={SITE.instagramUrl} target="_blank" rel="noopener" class="btn">Follow on Instagram</a>
+  </div>
+</section>

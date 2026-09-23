@@ -1,0 +1,102 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProductCard from '@/components/ProductCard.astro';
+import { getCollections, getProducts } from '@/lib/catalog';
+import { breadcrumbLd, itemListLd } from '@/lib/seo';
+import { cachePublicPage } from '@/server/http';
+import { TYPE_LABELS, type ProductType } from '@/lib/types';
+
+const [collections, products] = await Promise.all([getCollections(), getProducts()]);
+const site = Astro.site!;
+const withProducts = collections.filter((c) => products.some((p) => p.collection_id === c.id));
+const types = [...new Set(products.map((p) => p.product_type))] as ProductType[];
+cachePublicPage(Astro.response);
+---
+
+<BaseLayout
+  title="Shop all jewellery"
+  description="Shop Jhumka's gold-plated necklaces, pendants, bracelets and rings: infinity, hearts, tulip, moon and venus and more. Handpicked for every version of you."
+  jsonLd={[itemListLd(site, 'Jhumka jewellery', products), breadcrumbLd(site, [{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop/' }])]}
+>
+  <section class="shell pt-10 pb-6 sm:pt-14">
+    <p class="caps" data-reveal>{products.length} pieces</p>
+    <h1 class="display mt-3 text-[clamp(2.25rem,4.5vw,3.5rem)]" data-reveal>The <span class="accent">whole</span> collection</h1>
+  </section>
+
+  <div class="sticky top-[var(--header-h)] z-30 border-y border-purple-100 bg-white/95 backdrop-blur-md">
+    <div class="shell flex flex-wrap items-center justify-between gap-4 py-4">
+      <div class="scrollbar-none -mx-1 flex max-w-full gap-2 overflow-x-auto px-1" role="group" aria-label="Filter by collection">
+        <button type="button" class="chip" aria-pressed="true" data-filter="">All</button>
+        {withProducts.map((c) => <button type="button" class="chip whitespace-nowrap" aria-pressed="false" data-filter={c.slug}>{c.name}</button>)}
+      </div>
+      <div class="flex items-center gap-3">
+        {
+          types.length > 1 && (
+            <select class="h-10 rounded-[999px] border border-purple-200 bg-white px-4 text-sm" aria-label="Filter by type" data-filter-type>
+              <option value="">All types</option>
+              {types.map((t) => <option value={t}>{TYPE_LABELS[t]}</option>)}
+            </select>
+          )
+        }
+        <select class="h-10 rounded-[999px] border border-purple-200 bg-white px-4 text-sm" aria-label="Sort" data-sort>
+          <option value="featured">Featured</option>
+          <option value="price-asc">Price: low to high</option>
+          <option value="price-desc">Price: high to low</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <section class="shell py-8 sm:py-12" aria-label="Products">
+    <div class="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-4 lg:grid-cols-4" data-grid>
+      {products.map((p, i) => <ProductCard product={p} index={i} eager={i < 4} sizes="(min-width: 1024px) 23vw, 46vw" />)}
+    </div>
+    <p class="py-20 text-center" data-empty hidden>No pieces match. Try another filter.</p>
+  </section>
+</BaseLayout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const grid = document.querySelector<HTMLElement>('[data-grid]');
+    if (!grid) return;
+    const cards = [...grid.querySelectorAll<HTMLElement>('[data-product]')];
+    const empty = document.querySelector<HTMLElement>('[data-empty]');
+    const typeSel = document.querySelector<HTMLSelectElement>('[data-filter-type]');
+    const sortSel = document.querySelector<HTMLSelectElement>('[data-sort]');
+    const chips = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    let collection = new URLSearchParams(location.search).get('c') ?? '';
+
+    const apply = () => {
+      const type = typeSel?.value ?? '';
+      let shown = 0;
+      cards.forEach((card) => {
+        const ok = (!collection || card.dataset.collection === collection) && (!type || card.dataset.type === type);
+        card.hidden = !ok;
+        card.classList.add('is-in');
+        if (ok) shown++;
+      });
+      const sort = sortSel?.value ?? 'featured';
+      const price = (card: HTMLElement) => (card.dataset.price ? Number(card.dataset.price) : Infinity);
+      const sorted = [...cards].sort((a, b) =>
+        sort === 'price-asc' ? price(a) - price(b) : sort === 'price-desc' ? price(b) - price(a) : Number(a.dataset.order) - Number(b.dataset.order),
+      );
+      grid.append(...sorted);
+      if (empty) empty.hidden = shown > 0;
+      chips.forEach((ch) => ch.setAttribute('aria-pressed', String((ch.dataset.filter ?? '') === collection)));
+      const url = new URL(location.href);
+      if (collection) url.searchParams.set('c', collection);
+      else url.searchParams.delete('c');
+      history.replaceState(history.state, '', url);
+    };
+
+    chips.forEach((ch) =>
+      ch.addEventListener('click', () => {
+        collection = ch.dataset.filter ?? '';
+        apply();
+      }),
+    );
+    typeSel?.addEventListener('change', apply);
+    sortSel?.addEventListener('change', apply);
+    if (collection) apply();
+  });
+</script>

@@ -1,0 +1,72 @@
+---
+/**
+ * A product photo on its seeded velvet mesh tile (echoing the purple-bust Instagram shots).
+ * Without a photo, the tile carries the product name in the display face — never a drawing.
+ */
+import Photo from '@/components/Photo.astro';
+import MeshTile from './MeshTile.astro';
+import { resolveImage } from '@/lib/images';
+import type { CatalogProduct } from '@/lib/types';
+
+interface Props {
+  product: Pick<CatalogProduct, 'slug' | 'name' | 'images'>;
+  index?: number;
+  sizes?: string;
+  class?: string;
+  eager?: boolean;
+  /** Show the second photo on hover (cards). */
+  hoverSwap?: boolean;
+  fit?: 'cover' | 'contain';
+}
+const { product, index = 0, sizes = '(min-width: 1024px) 25vw, 50vw', class: cls, eager = false, hoverSwap = false, fit = 'cover' } = Astro.props;
+const first = product.images[index];
+const second = hoverSwap ? product.images[index + 1] : undefined;
+const src = resolveImage(first?.path, first);
+const src2 = resolveImage(second?.path, second);
+const alt = first?.alt?.trim() || `${product.name} by Jhumka`;
+const widths = [360, 540, 720, 960, 1280];
+const imgClass = fit === 'contain' ? 'absolute inset-0 size-full object-contain p-[8%]' : 'absolute inset-0 size-full object-cover';
+---
+
+<MeshTile seed={product.slug} tone="velvet" tall class:list={['product-image', cls]}>
+  {
+    src ? (
+      <>
+        <Photo
+          src={src}
+          alt={alt}
+          widths={widths}
+          sizes={sizes}
+          loading={eager ? 'eager' : 'lazy'}
+          fetchpriority={eager ? 'high' : 'auto'}
+          class={imgClass}
+        />
+        {src2 && (
+          <Photo
+            src={src2}
+            alt=""
+            widths={widths}
+            sizes={sizes}
+            loading="lazy"
+            class:list={[imgClass, 'product-image__alt']}
+          />
+        )}
+      </>
+    ) : (
+      <span class="absolute inset-0 grid place-items-center p-6 text-center">
+        <span class="display text-[clamp(1.5rem,2.4vw,2.25rem)] text-white/90" aria-hidden="true">jhumka</span>
+      </span>
+    )
+  }
+</MeshTile>
+
+<style>
+  .product-image__alt {
+    opacity: 0;
+    transition: opacity 0.7s var(--ease-silk);
+  }
+  :global(.group:hover) .product-image__alt,
+  :global(.group:focus-visible) .product-image__alt {
+    opacity: 1;
+  }
+</style>

@@ -1,0 +1,43 @@
+---
+/** Social proof: the newest published reviews from across the shop. */
+import Stars from '@/components/Stars.astro';
+import { recentReviews } from '@/server/reviews';
+
+const reviews = await recentReviews(3);
+const date = (d: Date) => new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+const trim = (s: string) => (s.length > 220 ? `${s.slice(0, s.lastIndexOf(' ', 219))}…` : s);
+---
+
+{
+  reviews.length >= 2 && (
+    <section class="section border-t border-purple-100" aria-labelledby="loved-title">
+      <div class="shell">
+        <p class="caps eyebrow text-center" data-reveal>Worn &amp; loved</p>
+        <h2 id="loved-title" class="section-title text-center" data-reveal>
+          What customers <span class="accent">say</span>
+        </h2>
+
+        <ul class="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {reviews.map((r) => (
+            <li class="rounded-[14px] border border-purple-100 p-5" data-reveal>
+              <div class="flex items-center justify-between gap-3">
+                <Stars rating={r.rating} label={`${r.rating} out of 5 stars`} />
+                <time class="text-xs opacity-70" datetime={r.createdAt.toISOString()}>
+                  {date(r.createdAt)}
+                </time>
+              </div>
+              {r.title && <p class="display mt-3 text-xl leading-snug">{r.title}</p>}
+              <p class="mt-2 text-[0.95rem]">{trim(r.body)}</p>
+              <p class="mt-4 text-xs">
+                <span class="font-medium">{r.authorName}</span> · verified buyer ·{' '}
+                <a class="underline underline-offset-4" href={`/products/${r.product.slug}/#reviews`}>
+                  {r.product.name}
+                </a>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}

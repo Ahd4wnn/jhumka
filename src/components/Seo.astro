@@ -1,0 +1,60 @@
+---
+import { SITE } from '@/config/site';
+import { isDemoCatalog } from '@/lib/catalog';
+import type { JsonLd } from '@/lib/seo';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string | null;
+  imageAlt?: string;
+  type?: 'website' | 'product' | 'article';
+  noindex?: boolean;
+  jsonLd?: JsonLd[];
+  price?: number | null;
+}
+
+const {
+  title,
+  description = SITE.description,
+  image,
+  imageAlt = `${SITE.name} — ${SITE.tagline}`,
+  type = 'website',
+  noindex = false,
+  jsonLd = [],
+  price,
+} = Astro.props;
+
+const site = Astro.site!;
+const fullTitle = title ? `${title} · ${SITE.titleSuffix}` : `${SITE.name} — ${SITE.tagline} | Gold-plated jewellery`;
+const canonical = new URL(Astro.url.pathname.replace(/\/?$/, '/'), site).toString();
+const ogImage = new URL(image || '/og-default.png', site).toString();
+// Demo builds (no Supabase) must never be indexed.
+const robots = noindex || (isDemoCatalog && import.meta.env.PROD) ? 'noindex, nofollow' : 'index, follow, max-image-preview:large';
+---
+
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta name="robots" content={robots} />
+<meta name="keywords" content={SITE.keywords.join(', ')} />
+<meta name="author" content={SITE.name} />
+
+<meta property="og:site_name" content={SITE.name} />
+<meta property="og:locale" content={SITE.locale} />
+<meta property="og:type" content={type === 'product' ? 'product' : type} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:alt" content={imageAlt} />
+{type === 'product' && price != null && <meta property="product:price:amount" content={String(price)} />}
+{type === 'product' && price != null && <meta property="product:price:currency" content={SITE.currency} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />
+
+{/* "<" is written as the JSON escape \u003c so customer text (reviews) can never close the script tag. */}
+{jsonLd.map((ld) => <script type="application/ld+json" is:inline set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />)}

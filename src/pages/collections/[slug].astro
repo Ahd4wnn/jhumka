@@ -1,0 +1,73 @@
+---
+import Photo from '@/components/Photo.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProductCard from '@/components/ProductCard.astro';
+import MeshTile from '@/components/MeshTile.astro';
+import { getCollection, getProductsInCollection } from '@/lib/catalog';
+import { cachePublicPage } from '@/server/http';
+import { imagePublicUrl, resolveImage } from '@/lib/images';
+import { breadcrumbLd, collectionPageLd, metaDescription } from '@/lib/seo';
+import type { CatalogProduct, Collection } from '@/lib/types';
+
+const found = await getCollection(Astro.params.slug ?? '');
+const items: CatalogProduct[] = found ? await getProductsInCollection(found.id) : [];
+if (!found || items.length === 0) return Astro.rewrite('/404');
+const c: Collection = found;
+cachePublicPage(Astro.response);
+const site = Astro.site!;
+const cover = resolveImage(c.cover_path) ?? resolveImage(items.find((p) => p.images.length)?.images[0]?.path, items.find((p) => p.images.length)?.images[0]);
+const description = metaDescription(
+  `${c.name} collection by Jhumka${c.tagline ? `: ${c.tagline}` : '.'} ${c.description ?? ''} ${items.length} gold-plated ${items.length === 1 ? 'piece' : 'pieces'}, handpicked for every version of you.`,
+);
+---
+
+<BaseLayout
+  title={`${c.name} collection`}
+  description={description}
+  image={imagePublicUrl(cover)}
+  jsonLd={[
+    collectionPageLd(site, c, items),
+    breadcrumbLd(site, [
+      { name: 'Home', path: '/' },
+      { name: 'Shop', path: '/shop/' },
+      { name: c.name, path: `/collections/${c.slug}/` },
+    ]),
+  ]}
+>
+  <section class="shell grid items-center gap-8 pt-8 pb-10 md:grid-cols-[0.85fr_1.15fr] md:gap-12">
+    <div class="relative aspect-[4/3] w-full overflow-hidden rounded-[18px] bg-purple-50 md:aspect-[4/5] md:max-h-[26rem]">
+      {
+        cover ? (
+          <Photo
+            src={cover}
+            alt=""
+            widths={[480, 720, 960]}
+            sizes="(min-width: 768px) 30vw, 90vw"
+            loading="eager"
+            class="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <MeshTile seed={c.slug} tone="velvet" tall class="absolute inset-0" />
+        )
+      }
+    </div>
+    <div>
+      <p class="caps eyebrow flex items-center gap-2">
+        <span class="arch inline-block h-5 w-3.5 bg-purple" aria-hidden="true"></span>
+        Collection · {items.length} {items.length === 1 ? 'piece' : 'pieces'}
+      </p>
+      <h1 class="display text-[clamp(2.25rem,4.5vw,3.5rem)]">{c.name}</h1>
+      {c.tagline && <p class="accent mt-2 text-[clamp(1.25rem,2vw,1.6rem)]">{c.tagline}</p>}
+      {c.description && <p class="mt-4 max-w-lg">{c.description}</p>}
+    </div>
+  </section>
+
+  <section class="shell border-t border-purple-100 py-10 sm:py-12" aria-label={`${c.name} pieces`}>
+    <div class="grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-4 lg:grid-cols-4">
+      {items.map((p, i) => <ProductCard product={p} index={i} sizes="(min-width: 1024px) 23vw, 46vw" />)}
+    </div>
+    <div class="mt-12 text-center">
+      <a href="/shop" class="btn btn--outline">See every piece</a>
+    </div>
+  </section>
+</BaseLayout>

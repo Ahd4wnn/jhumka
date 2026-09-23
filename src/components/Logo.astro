@@ -1,0 +1,40 @@
+---
+/**
+ * Brand mark. Uses the official logo from public/brand/logo.svg when it exists;
+ * until then the name is set in the display face (Alhabsyi).
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+
+interface Props {
+  class?: string;
+  /** Height for the image logo, e.g. "2.25rem". The text fallback scales with font-size. */
+  height?: string;
+  tone?: 'purple' | 'white';
+}
+const { class: cls, height = '2.25rem', tone = 'purple' } = Astro.props;
+const hasLogo = fs.existsSync(path.join(process.cwd(), 'public', 'brand', 'logo.svg'));
+---
+
+{
+  hasLogo ? (
+    <img
+      src="/brand/logo.svg"
+      alt="Jhumka"
+      class:list={['logo', cls, tone === 'white' && 'logo--white']}
+      style={`height:${height};width:auto`}
+      width="200"
+      height="80"
+    />
+  ) : (
+    <span class:list={['display leading-none', cls]} aria-label="Jhumka">
+      jhumka
+    </span>
+  )
+}
+
+<style>
+  .logo--white {
+    filter: brightness(0) invert(1);
+  }
+</style>

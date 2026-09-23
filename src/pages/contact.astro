@@ -1,0 +1,78 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { SITE } from '@/config/site';
+import { hasDatabase } from '@/server/db/client';
+import { getSettings } from '@/server/settings';
+import { cachePublicPage } from '@/server/http';
+
+const business = hasDatabase() ? (await getSettings()).business : null;
+const phone = SITE.contactPhone.replace(/^91(\d{5})(\d{5})$/, '+91 $1 $2');
+cachePublicPage(Astro.response);
+---
+
+<BaseLayout title="Contact us" description="Call, write to or visit Jhumka. We answer questions about orders, delivery and pieces.">
+  <section class="section">
+    <div class="shell mx-auto max-w-3xl">
+      <p class="caps eyebrow">We're here</p>
+      <h1 class="display text-[clamp(2rem,4vw,2.75rem)]">Contact <span class="accent">us</span></h1>
+      <p class="mt-4 max-w-xl">Questions about a piece, an order on its way, or something that arrived not quite right? Call us — it is usually the quickest way to sort things out.</p>
+
+      <div class="mt-8 grid gap-3 sm:grid-cols-2">
+        <div class="rounded-[14px] border border-purple-100 p-5">
+          <p class="caps">Phone &amp; WhatsApp</p>
+          <a class="mt-2 block text-lg underline underline-offset-4" href={`tel:+${SITE.contactPhone}`}>{phone}</a>
+          <p class="mt-1 text-sm opacity-80">
+            <span class="todo">[TO CONFIRM: hours, e.g. Mon–Sat, 10am–7pm IST]</span>
+          </p>
+        </div>
+
+        <div class="rounded-[14px] border border-purple-100 p-5">
+          <p class="caps">Email</p>
+          {
+            business?.email ? (
+              <a class="mt-2 block text-lg break-all underline underline-offset-4" href={`mailto:${business.email}`}>
+                {business.email}
+              </a>
+            ) : (
+              <p class="mt-2 text-lg opacity-70">[TO CONFIRM: support email address]</p>
+            )
+          }
+          <p class="mt-1 text-sm opacity-80">We reply within <span class="todo">[TO CONFIRM: 1–2 working days]</span>.</p>
+        </div>
+
+        <div class="rounded-[14px] border border-purple-100 p-5">
+          <p class="caps">Address</p>
+          {
+            business?.address ? (
+              <p class="mt-2 whitespace-pre-line">{business.address}</p>
+            ) : (
+              <p class="mt-2 opacity-70">[TO CONFIRM: full business address, as registered with Razorpay]</p>
+            )
+          }
+        </div>
+
+        <div class="rounded-[14px] border border-purple-100 p-5">
+          <p class="caps">Your order</p>
+          <p class="mt-2 text-sm">Check where your parcel is with your order number and mobile number.</p>
+          <a href="/track" class="btn btn--outline btn--sm mt-4">Track your order</a>
+        </div>
+      </div>
+
+      <p class="mt-8 text-sm">
+        Follow us on{' '}
+        <a class="underline underline-offset-4" href={SITE.instagramUrl} target="_blank" rel="noopener">
+          Instagram
+        </a>{' '}
+        for new pieces. For anything about an order, please use the phone number or email above.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .todo {
+    background: var(--color-purple-50);
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+  }
+</style>

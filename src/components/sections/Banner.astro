@@ -1,0 +1,53 @@
+---
+/**
+ * Home banner: one wide photograph, with the headline and buttons underneath so nothing covers
+ * the piece (and any text printed inside the photo is never cut or double-printed).
+ */
+import Photo from '@/components/Photo.astro';
+import MeshTile from '@/components/MeshTile.astro';
+import type { ResolvedImage } from '@/lib/images';
+
+interface Props {
+  photo: ResolvedImage | null;
+  photoAlt: string;
+  photoClass?: string;
+  eyebrow: string;
+  title: string;
+  sub: string;
+}
+const { photo, photoAlt, photoClass, eyebrow, title, sub } = Astro.props;
+---
+
+<section class="shell pt-4 pb-10 sm:pt-6 sm:pb-14" aria-labelledby="hero-title">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-[18px] bg-purple-50 sm:aspect-[16/8]">
+    {
+      photo ? (
+        <Photo
+          src={photo}
+          alt={photoAlt}
+          widths={[640, 960, 1280, 1920, 2400]}
+          sizes="(min-width: 1600px) 90rem, 100vw"
+          loading="eager"
+          fetchpriority="high"
+          class:list={['absolute inset-0 size-full object-cover', photoClass]}
+        />
+      ) : (
+        <MeshTile seed="hero" tone="velvet" tall class="absolute inset-0" />
+      )
+    }
+  </div>
+
+  <div class="mt-8 flex flex-col gap-6 sm:mt-10 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
+    <div>
+      <p class="caps" data-reveal>{eyebrow}</p>
+      <h1 id="hero-title" class="display mt-4 text-[clamp(2.25rem,4.5vw,3.5rem)] leading-[1.05]" data-reveal>
+        <Fragment set:html={title} />
+      </h1>
+      <p class="mt-4 max-w-md text-[1.05rem]" data-reveal>{sub}</p>
+    </div>
+    <div class="flex flex-wrap gap-3 sm:pb-2" data-reveal>
+      <a href="/shop" class="btn btn--lg">Shop the collection</a>
+      <a href="#collections" class="btn btn--outline btn--lg">Browse categories</a>
+    </div>
+  </div>
+</section>

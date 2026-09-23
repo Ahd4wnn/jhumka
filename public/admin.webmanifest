@@ -1,0 +1,15 @@
+{
+  "name": "Jhumka admin",
+  "short_name": "Jhumka",
+  "description": "Orders, customers and products for Jhumka.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#7D46AB",
+  "icons": [
+    { "src": "/icons/admin-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/admin-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/admin-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

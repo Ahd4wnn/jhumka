@@ -1,0 +1,384 @@
+---
+/**
+ * Order confirmation + tracking. Private: only reachable with the order's secret token
+ * (from checkout or the /track lookup).
+ */
+import { and, eq } from 'drizzle-orm';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import MeshTile from '@/components/MeshTile.astro';
+import Photo from '@/components/Photo.astro';
+import Stars from '@/components/Stars.astro';
+import { getDb, hasDatabase } from '@/server/db/client';
+import { orderItems, orders } from '@/server/db/schema';
+import { STATUS_PUBLIC, type OrderStatus } from '@/server/commerce/status';
+import { resolveImage } from '@/lib/images';
+import { canReview, displayName, MAX_REVIEW_PHOTOS, reviewsForOrder } from '@/server/reviews';
+import { getSettings } from '@/server/settings';
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+const token = Astro.url.searchParams.get('t') ?? '';
+const number = (Astro.params.number ?? '').toUpperCase();
+if (!hasDatabase() || !token) return Astro.rewrite('/404');
+
+const db = getDb();
+const [order] = await db
+  .select()
+  .from(orders)
+  .where(and(eq(orders.number, number), eq(orders.accessToken, token)));
+if (!order) return Astro.rewrite('/404');
+
+const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+const [reviewed, settings] = await Promise.all([reviewsForOrder(order.id), getSettings()]);
+const reviewable = canReview(order.status);
+const toReview = reviewable && items.some((i) => i.productId && !reviewed.has(i.productId));
+
+// Arriving from "Write a review" on a product page (via /track?review=slug).
+const wantSlug = Astro.url.searchParams.get('review');
+const wanted = wantSlug ? items.find((i) => i.slug === wantSlug) : undefined;
+const reviewNotice = !wantSlug
+  ? null
+  : !wanted
+    ? 'That piece is not part of this order. Check the order number, or pick one of your pieces below.'
+    : !reviewable
+      ? `You can review ${wanted.name} once your order has shipped.`
+      : !wanted.productId
+        ? `${wanted.name} is no longer in our shop, so it cannot be reviewed.`
+        : reviewed.has(wanted.productId)
+          ? `You have already reviewed ${wanted.name}. Thank you!`
+          : null;
+const autoOpen = wanted && !reviewNotice ? wanted.productId : null;
+const field = 'field mt-2';
+const star = 'M12 2.6l2.84 5.94 6.53.78-4.8 4.5 1.24 6.47L12 17.13 6.19 20.29l1.24-6.47-4.8-4.5 6.53-.78z';
+
+const inr = (p: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: p % 100 ? 2 : 0 }).format(p / 100);
+const date = (d: Date | null) => (d ? new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(d) : null);
+const unpaid = order.status === 'pending_payment' || order.status === 'payment_failed';
+const closed = order.status === 'cancelled' || order.status === 'refunded';
+const firstName = order.name.split(' ')[0];
+
+const steps: { key: OrderStatus; label: string; at: Date | null }[] = [
+  { key: 'paid', label: 'Confirmed', at: order.paidAt },
+  { key: 'packed', label: 'Packed', at: order.packedAt },
+  { key: 'shipped', label: 'Shipped', at: order.shippedAt },
+  { key: 'delivered', label: 'Delivered', at: order.deliveredAt },
+];
+const reached = (i: number) => Boolean(steps[i].at) || steps.slice(i + 1).some((s) => s.at);
+const a = order.shippingAddress;
+---
+
+<BaseLayout title={`Order ${order.number}`} description="Your Jhumka order." noindex>
+  <section class="shell pt-12 pb-24 sm:pt-20" data-order data-number={order.number} data-token={token}>
+    <p class="caps">Order {order.number}</p>
+    <h1 class="display mt-3 text-[clamp(2rem,4vw,2.75rem)]">
+      {unpaid ? <>Almost <span class="accent">there</span></> : closed ? <>Order {STATUS_PUBLIC[order.status].toLowerCase()}</> : <>Thank you, <span class="accent">{firstName}</span></>}
+    </h1>
+    <p class="mt-4 max-w-xl">
+      {
+        unpaid
+          ? 'We have saved your order, but the payment was not completed. Complete it below to confirm your pieces.'
+          : closed
+            ? 'This order is closed. Any refund goes back to your original payment method.'
+            : order.status === 'delivered'
+              ? 'Your order has been delivered. We hope you love your pieces, and we would love to hear what you think.'
+              : order.status === 'shipped'
+                ? 'Your order is on its way. Once your pieces arrive, you can review them right here.'
+                : 'Your order is confirmed. We will pack it with care and share tracking details once it ships.'
+      }
+    </p>
+    {reviewNotice && <p class="mt-5 max-w-xl rounded-[10px] border border-purple-200 bg-purple-25 px-4 py-3 text-sm" role="status">{reviewNotice}</p>}
+
+    {
+      unpaid && (
+        <div class="mt-8">
+          <button type="button" class="btn" data-complete-payment>Complete payment · {inr(order.totalPaise)}</button>
+          <p class="mt-3 text-sm" data-pay-error hidden />
+        </div>
+      )
+    }
+
+    {
+      !unpaid && !closed && (
+        <ol class="mt-10 grid gap-5 rounded-[14px] border border-purple-100 p-5 sm:grid-cols-4" aria-label="Order progress">
+          {steps.map((s, i) => (
+            <li class:list={['flex items-start gap-3', !reached(i) && 'opacity-40']}>
+              <span class:list={['mt-1.5 size-2.5 shrink-0 rounded-full', reached(i) ? 'bg-purple' : 'border border-purple']} aria-hidden="true" />
+              <span>
+                <span class="caps block">{s.label}</span>
+                <span class="text-sm">{date(s.at) ?? (reached(i) ? 'Done' : 'Coming up')}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+
+    {
+      order.status === 'shipped' && (order.trackingNumber || order.trackingUrl) && (
+        <p class="mt-6">
+          Shipped with {order.courier ?? 'our courier partner'}
+          {order.trackingNumber && <> · Tracking number <strong class="font-medium">{order.trackingNumber}</strong></>}
+          {order.trackingUrl && (
+            <>
+              {' '}
+              ·{' '}
+              <a class="underline underline-offset-4" href={order.trackingUrl} target="_blank" rel="noopener">
+                Track shipment ↗
+              </a>
+            </>
+          )}
+        </p>
+      )
+    }
+
+    <div class="mt-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:gap-14">
+      <div>
+        <h2 class="text-sm font-medium">Your pieces</h2>
+        <ul class="mt-3 divide-y divide-purple-100 rounded-[14px] border border-purple-100 px-4">
+          {
+            items.map((i) => {
+              const img = resolveImage(i.imagePath);
+              return (
+                <li class="flex gap-5 py-5">
+                  <div class="relative h-24 w-19 shrink-0 overflow-hidden rounded-[10px]">
+                    {img ? <Photo src={img} alt="" sizes="96px" class="absolute inset-0 size-full object-cover" /> : <MeshTile seed={i.slug} class="absolute inset-0" />}
+                  </div>
+                  <div class="flex-1">
+                    <a href={`/products/${i.slug}/`} class="font-medium leading-snug hover:underline hover:underline-offset-4">
+                      {i.name}
+                    </a>
+                    <p class="mt-1 text-sm">
+                      Qty {i.qty} · {inr(i.unitPricePaise)}
+                    </p>
+                    {reviewable && i.productId && (reviewed.has(i.productId) ? (
+                      <p class="caps mt-3 flex items-center gap-2 !text-[0.6rem]">
+                        <Stars rating={reviewed.get(i.productId)!.rating} class="h-2.5" />
+                        {reviewed.get(i.productId)!.status === 'published' ? 'Your review is live' : 'Review sent · thank you'}
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        class="caps mt-3 !text-[0.62rem] underline underline-offset-4 hover:no-underline"
+                        data-review-open
+                        data-product-id={i.productId}
+                        data-product-name={i.name}
+                        data-autoopen={autoOpen === i.productId ? '' : undefined}
+                      >
+                        Write a review
+                      </button>
+                    ))}
+                  </div>
+                  <p class="tabular-nums">{inr(i.lineTotalPaise)}</p>
+                </li>
+              );
+            })
+          }
+        </ul>
+        <dl class="mt-6 grid max-w-sm grid-cols-[1fr_auto] gap-y-2 text-sm sm:ml-auto">
+          <dt>Subtotal</dt><dd class="text-right tabular-nums">{inr(order.subtotalPaise)}</dd>
+          {order.discountPaise > 0 && (<><dt>Discount{order.couponCode ? ` (${order.couponCode})` : ''}</dt><dd class="text-right tabular-nums">−{inr(order.discountPaise)}</dd></>)}
+          <dt>Shipping</dt><dd class="text-right tabular-nums">{order.shippingPaise ? inr(order.shippingPaise) : 'Free'}</dd>
+          <dt class="border-t border-purple-200 pt-3 font-medium">Total</dt><dd class="border-t border-purple-200 pt-3 text-right text-xl tabular-nums">{inr(order.totalPaise)}</dd>
+          {order.refundedPaise > 0 && (<><dt>Refunded</dt><dd class="text-right tabular-nums">{inr(order.refundedPaise)}</dd></>)}
+        </dl>
+      </div>
+
+      <aside class="grid content-start gap-8">
+        <div>
+          <h2 class="text-sm font-medium">Delivering to</h2>
+          <address class="mt-3 not-italic leading-relaxed">
+            {a.name}<br />
+            {a.line1}{a.line2 && <><br />{a.line2}</>}{a.landmark && <><br />Near {a.landmark}</>}<br />
+            {a.city}, {a.state} {a.pincode}<br />
+            {order.phone.replace(/^\+91/, '+91 ')}
+          </address>
+        </div>
+        <div>
+          <h2 class="text-sm font-medium">Status</h2>
+          <p class="mt-3">{STATUS_PUBLIC[order.status]}</p>
+          <p class="mt-1 text-sm">Placed {date(order.createdAt)}</p>
+        </div>
+        <p class="text-sm">Save this page to check your order anytime, or use <a href="/track" class="underline underline-offset-4">Track order</a> with your order number and phone.</p>
+        <a href="/shop" class="btn btn--outline">Continue shopping</a>
+      </aside>
+    </div>
+
+    {
+      toReview && (
+        <dialog
+          class="review-dialog m-auto max-h-[calc(100svh-1.5rem)] w-[min(36rem,calc(100vw-1.5rem))] overflow-y-auto rounded-[18px] bg-white p-0 text-purple"
+          data-review-dialog
+          data-max-photos={MAX_REVIEW_PHOTOS}
+          data-lenis-prevent
+          aria-labelledby="review-title"
+        >
+          <form class="grid gap-7 p-6 sm:p-9" novalidate data-review-form>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="caps">Your review</p>
+                <h2 id="review-title" class="display mt-2 text-[2rem] leading-tight focus:outline-none" tabindex="-1" autofocus data-review-product />
+              </div>
+              <button type="button" class="-mt-2 -mr-2 grid size-10 shrink-0 place-items-center hover:bg-purple-50" data-review-close aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <input type="hidden" name="productId" />
+
+            <fieldset>
+              <legend class="text-sm font-medium">Your rating</legend>
+              <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div class="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <label class="star cursor-pointer" data-star>
+                      <input type="radio" name="rating" value={n} class="sr-only" />
+                      <svg viewBox="0 0 24 24" class="size-9" fill="currentColor" aria-hidden="true">
+                        <path d={star} />
+                      </svg>
+                      <span class="sr-only">
+                        {n} star{n > 1 ? 's' : ''}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <span class="text-sm" data-rating-word>
+                  Tap a star
+                </span>
+              </div>
+            </fieldset>
+
+            <label class="block">
+              <span class="text-sm font-medium">
+                Headline <span class="font-normal opacity-70">(optional)</span>
+              </span>
+              <input name="title" maxlength="80" class={`${field} h-12`} placeholder="Sum it up in a few words" />
+            </label>
+
+            <label class="block">
+              <span class="text-sm font-medium">Your review</span>
+              <textarea name="body" rows="5" maxlength="2000" required class={`${field} py-3 leading-relaxed`} placeholder="How does it look and feel? How do you wear it?" />
+            </label>
+
+            <div>
+              <p class="text-sm font-medium">
+                Photos <span class="font-normal opacity-70">(optional, up to {MAX_REVIEW_PHOTOS})</span>
+              </p>
+              <ul class="mt-3 flex flex-wrap gap-2" data-photo-list>
+                <li data-photo-add>
+                  <label class="grid size-20 cursor-pointer place-items-center rounded-[10px] border border-dashed border-purple-300 text-center text-xs transition-colors hover:border-purple hover:bg-purple-25 sm:size-24">
+                    <span>
+                      <span class="block text-2xl leading-none">+</span>
+                      Add photo
+                    </span>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="sr-only" data-photo-input />
+                  </label>
+                </li>
+              </ul>
+            </div>
+
+            <label class="block">
+              <span class="text-sm font-medium">Name shown with your review</span>
+              <input name="authorName" maxlength="40" required value={displayName(order.name)} class={`${field} h-12`} />
+            </label>
+
+            <p class="text-sm" role="alert" data-review-error hidden />
+            <div>
+              <button class="btn w-full" data-review-submit>
+                Post review
+              </button>
+              <p class="mt-3 text-center text-xs">
+                {settings.reviews.autoPublish ? 'Your review appears on the site straight away.' : 'We read every review before it appears on the site.'}
+              </p>
+            </div>
+          </form>
+
+          <div class="grid justify-items-center gap-5 px-6 py-14 text-center sm:px-9" data-review-thanks hidden>
+            <p class="caps">Review sent</p>
+            <p class="display text-6xl">
+              Thank <span class="accent">you</span>
+            </p>
+            <p class="max-w-xs">
+              {settings.reviews.autoPublish ? 'Your review is now live on the piece’s page.' : 'We will publish it once we have had a quick look.'}
+            </p>
+            <button type="button" class="btn btn--outline mt-2" data-review-close>
+              Done
+            </button>
+          </div>
+        </dialog>
+      )
+    }
+  </section>
+</BaseLayout>
+
+<style>
+  .star {
+    color: var(--color-purple-200);
+    transition: color 0.2s;
+  }
+  .star[data-on] {
+    color: var(--color-purple);
+  }
+  .star:has(input:focus-visible) svg {
+    outline: 1px solid var(--color-purple);
+    outline-offset: 2px;
+  }
+  .review-dialog::backdrop {
+    background: color-mix(in oklab, var(--color-purple) 45%, transparent);
+  }
+</style>
+
+<script>
+  import { initReviewForm } from '@/scripts/review-form';
+  document.addEventListener('astro:page-load', initReviewForm);
+</script>
+
+<script>
+  // "Complete payment" for an unpaid order: fetch fresh Razorpay params and open checkout.
+  document.addEventListener('astro:page-load', () => {
+    const root = document.querySelector<HTMLElement>('[data-order]');
+    const btn = root?.querySelector<HTMLButtonElement>('[data-complete-payment]');
+    if (!root || !btn || btn.dataset.ready) return;
+    btn.dataset.ready = '1';
+    const err = root.querySelector<HTMLElement>('[data-pay-error]')!;
+    const post = async (url: string, body: unknown) => {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? 'Something went wrong.');
+      return d;
+    };
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const p = await post('/api/checkout/resume', { number: root.dataset.number, token: root.dataset.token });
+        if (p.redirect) return location.assign(p.redirect);
+        if (!(window as unknown as { Razorpay?: unknown }).Razorpay) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            s.onload = res;
+            s.onerror = rej;
+            document.head.append(s);
+          });
+        }
+        const Rzp = (window as unknown as { Razorpay: new (o: object) => { open(): void } }).Razorpay;
+        new Rzp({
+          key: p.keyId,
+          amount: p.amount,
+          currency: p.currency,
+          order_id: p.razorpayOrderId,
+          name: 'Jhumka',
+          description: `Order ${p.orderNumber}`,
+          prefill: p.prefill,
+          theme: { color: '#7D46AB' },
+          handler: async (r: object) => {
+            const done = await post('/api/checkout/verify', r);
+            location.assign(done.redirect);
+          },
+          modal: { ondismiss: () => (btn.disabled = false) },
+        }).open();
+      } catch (e) {
+        err.hidden = false;
+        err.textContent = (e as Error).message;
+        btn.disabled = false;
+      }
+    });
+  });
+</script>

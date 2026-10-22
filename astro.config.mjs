@@ -39,9 +39,14 @@ export default defineConfig({
   integrations: [react({ include: ['**/admin/**'] })],
   vite: {
     plugins: [tailwindcss()],
+    // Pre-bundle the admin's libraries at startup: found later (when an admin page loads) they make Vite
+    // re-bundle mid-session, and pages already open then fail with "504 Outdated Optimize Dep".
+    optimizeDeps: {
+      include: ['react-router', '@tanstack/react-query', 'lucide-react', 'recharts', 'motion', 'gsap', 'gsap/ScrollTrigger', 'lenis'],
+    },
     ssr: {
       // Native / CommonJS server-only packages stay external to the SSR bundle.
-      external: ['@node-rs/argon2', 'sharp', 'pdfkit', 'postgres', 'razorpay'],
+      external: ['@node-rs/argon2', 'sharp', 'pdfkit', 'postgres', 'razorpay', 'nodemailer'],
     },
   },
 });

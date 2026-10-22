@@ -46,6 +46,11 @@ export const GET: APIRoute = handle(async ({ locals, url }) => {
         createdAt: orders.createdAt,
         paidAt: orders.paidAt,
         items: sql<number>`(select coalesce(sum(${orderItems.qty}), 0)::int from ${orderItems} where ${orderItems.orderId} = ${orders.id})`,
+        courier: orders.courier,
+        trackingNumber: orders.trackingNumber,
+        trackingUrl: orders.trackingUrl,
+        // Same link as the detail route; the raw token is never returned on its own.
+        customerLink: sql<string>`'/order/' || ${orders.number} || '?t=' || ${orders.accessToken}`,
       })
       .from(orders)
       .where(cond)

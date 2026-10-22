@@ -13,10 +13,10 @@ const { photo, photoAlt } = Astro.props;
 
 <section id="story" class="section" aria-labelledby="story-title">
   <div class="shell grid items-center gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
-    <div class="relative mx-auto aspect-[4/5] w-full max-w-[34rem] overflow-hidden rounded-[18px] bg-purple-50 sm:aspect-[16/10] lg:aspect-[4/5] lg:max-h-[32rem]">
+    <div class="relative mx-auto aspect-[4/5] w-full max-w-[34rem] overflow-hidden rounded-[18px] bg-purple-50 sm:aspect-[16/10] lg:aspect-[4/5] lg:max-h-[32rem]" data-reveal-media>
       {
         photo ? (
-          <Photo src={photo} alt={photoAlt} widths={[640, 960, 1280]} sizes="(min-width: 1024px) 45vw, 100vw" class="absolute inset-0 size-full object-cover" />
+          <Photo src={photo} alt={photoAlt} widths={[640, 960, 1280]} sizes="(min-width: 1024px) 45vw, 100vw" class="absolute inset-0 size-full object-cover" data-parallax />
         ) : (
           <MeshTile seed="story" tone="velvet" tall class="absolute inset-0" />
         )

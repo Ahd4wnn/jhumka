@@ -101,6 +101,10 @@ export interface OrderRow {
   createdAt: string;
   paidAt: string | null;
   items: number;
+  courier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  customerLink: string;
 }
 export interface Customer {
   id: string;

@@ -9,7 +9,7 @@ import { getDb } from '@/server/db/client';
 import { orders } from '@/server/db/schema';
 import { addEvent, markOrderPaid, markPaymentFailed } from '@/server/commerce/orders';
 import { verifyWebhookSignature } from '@/server/commerce/razorpay';
-import { json } from '@/server/http';
+import { HttpError, json } from '@/server/http';
 
 interface PaymentEntity {
   id: string;
@@ -43,8 +43,10 @@ export const POST: APIRoute = async ({ request }) => {
       if (order) await addEvent(db, order.id, 'refund', `Razorpay confirmed refund ₹${(r.amount / 100).toFixed(2)} (${r.id})`);
     }
   } catch (err) {
-    // Unknown orders (e.g. test events) are acknowledged so Razorpay doesn't retry forever.
     console.error('[webhook]', event.event, err);
+    // Unknown orders (e.g. test events) are acknowledged so Razorpay doesn't retry forever; anything
+    // else (database down…) gets a 500 so Razorpay retries and a captured payment is never dropped.
+    if (!(err instanceof HttpError && err.status === 404)) return json({ error: 'Temporary failure' }, { status: 500 });
   }
   return json({ ok: true });
 };

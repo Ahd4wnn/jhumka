@@ -46,7 +46,7 @@ const tiles = all.slice(0, all.length >= 6 ? 6 : all.length >= 3 ? 3 : 0);
       <ul class:list={['shell mt-9 grid grid-cols-3 gap-2 lg:gap-3', tiles.length === 6 && 'lg:grid-cols-6']}>
         {tiles.map((t) => (
           <li data-reveal>
-            <a href={t.href} target="_blank" rel="noopener" class="group relative block aspect-square overflow-hidden rounded-[12px] bg-purple-50" aria-label={t.label}>
+            <a href={t.href} target="_blank" rel="noopener" class="group relative block aspect-square overflow-hidden rounded-[12px] bg-purple-50" aria-label={t.label} data-reveal-media>
               <Photo
                 src={t.src}
                 alt=""

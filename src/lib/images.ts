@@ -39,8 +39,13 @@ export function lifestylePhotos(): ImageMetadata[] {
     .map((k) => lifestyle[k].default);
 }
 
-/** The home page hero image: the first file in src/assets/hero, if any (replace it to change the hero). */
-export function heroImage(): ImageMetadata | null {
-  const first = Object.keys(hero).sort()[0];
-  return first ? hero[first].default : null;
+/**
+ * The home page hero image: the first file in src/assets/hero, if any (replace it to change the hero).
+ * A file named `*-mobile.*` is the optional phone crop (4:5), picked with heroImage('mobile').
+ */
+export function heroImage(variant: 'desktop' | 'mobile' = 'desktop'): ImageMetadata | null {
+  const key = Object.keys(hero)
+    .sort()
+    .find((k) => /-mobile\.\w+$/.test(k) === (variant === 'mobile'));
+  return key ? hero[key].default : null;
 }

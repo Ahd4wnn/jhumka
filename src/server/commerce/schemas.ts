@@ -30,13 +30,13 @@ export const checkoutRequest = z.object({
   items: cartItems,
   name: text('full name', 80),
   phone,
+  // Required: the receipt and invoice are emailed here.
   email: z
-    .string()
+    .string({ error: 'Enter your email for the receipt.' })
     .trim()
     .max(160)
-    .optional()
-    .transform((v) => (v ? v.toLowerCase() : null))
-    .refine((v) => v == null || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'Enter a valid email address.'),
+    .toLowerCase()
+    .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'Enter a valid email address.'),
   address,
   note: z.string().trim().max(500).optional(),
   couponCode: z.string().trim().max(40).optional(),

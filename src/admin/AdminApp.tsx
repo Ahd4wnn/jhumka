@@ -197,6 +197,12 @@ function useLiveAlerts(): number {
       qc.invalidateQueries({ queryKey: ['reviews'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
     });
+    es.addEventListener('order.updated', (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      toast(data.message, `/admin/orders/${data.orderNumber}`);
+      chime();
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    });
     es.addEventListener('notification.failed', (e) => toast(JSON.parse((e as MessageEvent).data).message));
     return () => {
       es.close();

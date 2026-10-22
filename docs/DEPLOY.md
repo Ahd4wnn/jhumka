@@ -108,11 +108,22 @@ Open `https://jhumka.in` — it should load with a valid certificate within a mi
 3. **Payment capture**: keep *Automatic* (the default).
 4. `sudo systemctl restart jhumka`, then place a real ₹1–₹10 test order and refund it from the admin.
 
-## 7. WhatsApp order alerts (free, CallMeBot)
+## 7. Telegram order alerts (free)
 
-On the owner's phone: save **+34 623 91 22 04**, send it the WhatsApp message
-`I allow callmebot to send me messages`, and paste the API key it replies with into
-**Admin → Settings → Order alerts**. Press **Send test alert**.
+1. In Telegram, open **@BotFather** → `/newbot` → pick a name and a username ending in `bot` → copy the token.
+2. Create a group with the founders, add the bot, and send `/start@<your_bot_username>` in the group.
+3. **Admin → Settings → Order alerts on Telegram**: paste the token → **Save** → **Find chats** → pick the
+   group → turn alerts on → **Save** → **Send test alert**.
+
+## 7b. Receipt emails (free, Brevo SMTP)
+
+1. Sign up at brevo.com (free plan, 300 emails/day). **Senders, Domains & Dedicated IPs → Domains** → add
+   `shopjhumka.in` and add the DNS records it shows at your domain registrar → **Verify**.
+2. **Senders** → add `orders@shopjhumka.in` (name: Jhumka).
+3. **SMTP & API → SMTP** → generate an SMTP key. Add to `/etc/jhumka.env`: `SMTP_HOST=smtp-relay.brevo.com`,
+   `SMTP_PORT=587`, `SMTP_USER=<login shown>`, `SMTP_PASS=<SMTP key>`, `MAIL_FROM="Jhumka <orders@shopjhumka.in>"`,
+   `MAIL_REPLY_TO=<an inbox you read>` → `sudo systemctl restart jhumka`.
+4. Every paid order now emails the customer a receipt with the invoice PDF attached.
 
 ## 8. Instagram feed on the home page (free, official API)
 

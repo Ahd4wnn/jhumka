@@ -7,7 +7,8 @@ export interface StoreSettings {
   business: { name: string; legalName: string; address: string; email: string; phone: string; gstin: string | null; state: string };
   invoice: { prefix: string };
   inventory: { lowStockThreshold: number };
-  alerts: { whatsappEnabled: boolean; callmebotPhone: string; callmebotApiKey: string };
+  /** telegramChatIds: comma-separated chat ids (a group id covers every founder in it). */
+  alerts: { telegramEnabled: boolean; telegramBotToken: string; telegramChatIds: string };
   /** autoPublish: new reviews go live without approval. */
   reviews: { autoPublish: boolean };
   /** Instagram feed connection (token from the Meta App Dashboard) and sync status. */
@@ -29,7 +30,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   business: { name: 'Jhumka', legalName: 'Jhumka', address: '', email: '', phone: '+91 62381 93133', gstin: null, state: 'Kerala' },
   invoice: { prefix: 'JH/INV/' },
   inventory: { lowStockThreshold: 3 },
-  alerts: { whatsappEnabled: true, callmebotPhone: '+916238193133', callmebotApiKey: '' },
+  alerts: { telegramEnabled: false, telegramBotToken: '', telegramChatIds: '' },
   reviews: { autoPublish: false },
   instagram: { accessToken: '', userId: null, username: null, tokenRefreshedAt: null, tokenExpiresAt: null, lastSyncAt: null, lastError: null },
 };

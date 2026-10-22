@@ -9,6 +9,7 @@ import { env, requireEnv } from '../env';
 export interface RazorpayGateway {
   createOrder(input: { amount: number; receipt: string; notes?: Record<string, string> }): Promise<{ id: string; amount: number; currency: string }>;
   fetchPayment(paymentId: string): Promise<{ id: string; method?: string; status?: string; amount?: number; order_id?: string }>;
+  fetchOrderPayments(orderId: string): Promise<{ id: string; method?: string; status?: string }[]>;
   refund(paymentId: string, input: { amount: number; notes?: Record<string, string> }): Promise<{ id: string; amount: number; status?: string }>;
 }
 
@@ -29,6 +30,10 @@ export function getRazorpay(): RazorpayGateway {
     fetchPayment: async (id) => {
       const p = await rzp.payments.fetch(id);
       return { id: p.id, method: p.method, status: p.status, amount: Number(p.amount), order_id: p.order_id };
+    },
+    fetchOrderPayments: async (orderId) => {
+      const { items } = await rzp.orders.fetchPayments(orderId);
+      return items.map((p) => ({ id: p.id, method: p.method, status: p.status }));
     },
     refund: async (paymentId, { amount, notes }) => {
       const r = await rzp.payments.refund(paymentId, { amount, notes });

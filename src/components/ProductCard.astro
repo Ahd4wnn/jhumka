@@ -27,7 +27,7 @@ const onSale = p.compare_at_price_inr != null && p.price_inr != null && p.compar
   data-reveal
 >
   <a href={href} class="block" aria-label={p.name}>
-    <div class="media relative aspect-[4/5] overflow-hidden rounded-[14px]" transition:name={morph ? `product-${p.slug}` : undefined}>
+    <div class="media relative aspect-[4/5] overflow-hidden rounded-[14px]" data-reveal-media transition:name={morph ? `product-${p.slug}` : undefined}>
       <ProductImage product={p} sizes={sizes} hoverSwap eager={eager} class="absolute inset-0 transition-transform duration-700 ease-[var(--ease-silk)] group-hover:scale-[1.04]" />
       {p.stock_status !== 'in_stock' && <span class="tile-label absolute top-2.5 left-2.5 !px-2.5 !py-1 !text-[0.62rem]">{STOCK_LABELS[p.stock_status]}</span>}
     </div>

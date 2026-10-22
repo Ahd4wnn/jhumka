@@ -1,4 +1,4 @@
-import type { OrderStatus } from './api';
+import type { OrderRow, OrderStatus } from './api';
 
 export const inr = (paise: number | null | undefined, opts: { compact?: boolean } = {}) => {
   if (paise == null) return '—';
@@ -43,3 +43,18 @@ export const STATUS: Record<OrderStatus, { label: string; tone: 'solid' | 'soft'
 };
 
 export const phone = (p: string) => p.replace(/^\+91(\d{5})(\d{5})$/, '+91 $1 $2');
+
+/** wa.me click-to-chat link; wa.me wants the number as bare digits with country code. */
+export const waLink = (phone: string, text: string) => `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+
+export const shipMessage = (o: Pick<OrderRow, 'name' | 'number' | 'courier' | 'trackingNumber' | 'trackingUrl' | 'customerLink'>, origin: string) =>
+  [
+    `Hi ${o.name.trim().split(/\s+/)[0]}, your Jhumka order ${o.number} is on its way 💜`,
+    o.courier && `Courier: ${o.courier}`,
+    o.trackingNumber && `Tracking ID: ${o.trackingNumber}`,
+    o.trackingUrl && `Track: ${o.trackingUrl}`,
+    `Your order: ${origin}${o.customerLink}`,
+    'Thank you for shopping with Jhumka.',
+  ]
+    .filter(Boolean)
+    .join('\n');

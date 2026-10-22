@@ -3,9 +3,12 @@
  * - deliver pending owner alerts every 20 s
  * - prune expired admin sessions every 6 h
  * - refresh the Instagram feed (and renew its token) every 30 min
+ * - ask Razorpay about recent unpaid orders every 5 min (catches payments whose webhook never came)
  */
 import { hasDatabase } from './db/client';
 import { pruneExpiredSessions } from './auth/session';
+import { reconcilePending } from './commerce/orders';
+import { hasRazorpay } from './commerce/razorpay';
 import { processOutbox } from './notify/outbox';
 import { instagramTick } from './instagram';
 
@@ -18,6 +21,7 @@ export function startBackgroundJobs() {
   setInterval(safe('outbox', processOutbox), 20_000).unref();
   setInterval(safe('sessions', pruneExpiredSessions), 6 * 60 * 60_000).unref();
   setInterval(safe('instagram', instagramTick), 30 * 60_000).unref();
+  if (hasRazorpay()) setInterval(safe('reconcile', reconcilePending), 5 * 60_000).unref();
   setTimeout(safe('outbox', processOutbox), 3_000).unref();
   setTimeout(safe('instagram', instagramTick), 15_000).unref();
 }

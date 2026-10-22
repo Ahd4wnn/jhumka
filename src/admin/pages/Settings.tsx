@@ -10,7 +10,7 @@ interface StoreSettings {
   business: { name: string; legalName: string; address: string; email: string; phone: string; gstin: string | null; state: string };
   invoice: { prefix: string };
   inventory: { lowStockThreshold: number };
-  alerts: { whatsappEnabled: boolean; callmebotPhone: string; callmebotApiKey: string };
+  alerts: { telegramEnabled: boolean; telegramBotToken: string; telegramChatIds: string };
   reviews: { autoPublish: boolean };
 }
 
@@ -61,29 +61,51 @@ function Alerts({ initial, owner }: { initial: StoreSettings['alerts']; owner: b
   const save = useSave<StoreSettings['alerts']>('alerts');
   const toast = useToast();
   const log = useQuery({ queryKey: ['alerts-log'], queryFn: () => get<{ notifications: { id: string; status: string; attempts: number; lastError: string | null; createdAt: string; sentAt: string | null }[] }>('/alerts') });
-  const test = useMutation({ mutationFn: () => post('/alerts'), onSuccess: () => toast('Test alert sent — check WhatsApp'), onError: (e) => toast(e.message) });
+  const test = useMutation({ mutationFn: () => post('/alerts'), onSuccess: () => toast('Test alert sent — check Telegram'), onError: (e) => toast(e.message) });
+  const find = useMutation({ mutationFn: () => get<{ chats: { id: string; title: string }[] }>('/telegram'), onError: (e) => toast(e.message) });
+  const addChat = (id: string) => setV({ ...v, telegramChatIds: [...new Set([...v.telegramChatIds.split(/[\s,]+/).filter(Boolean), id])].join(', ') });
   return (
-    <Card title="Order alerts on WhatsApp">
+    <Card title="Order alerts on Telegram">
       <div className="grid gap-4">
-        <p className="text-sm">
-          Free alerts through CallMeBot. One-time setup on the owner's phone: save <strong className="font-medium">+34 623 91 22 04</strong> as a contact, send it the WhatsApp message{' '}
-          <em>I allow callmebot to send me messages</em>, then paste the API key it replies with below.
-        </p>
-        <Toggle checked={v.whatsappEnabled} onChange={(x) => setV({ ...v, whatsappEnabled: x })} label="Send a WhatsApp alert for every paid order" disabled={!owner} />
+        <ol className="grid list-decimal gap-1 pl-5 text-sm">
+          <li>
+            In Telegram, open <strong className="font-medium">@BotFather</strong>, send <em>/newbot</em>, choose a name and a username ending in <em>bot</em>, and copy the token it sends you.
+          </li>
+          <li>Create a group (for example "Jhumka Orders"), add your co-founders and the bot, then send <em>/start</em> in the group.</li>
+          <li>
+            Paste the token below and press Save, then <strong className="font-medium">Find chats</strong> and pick the group. Turn alerts on, Save again, and send a test.
+          </li>
+        </ol>
+        <Toggle checked={v.telegramEnabled} onChange={(x) => setV({ ...v, telegramEnabled: x })} label="Send a Telegram alert for every paid order" disabled={!owner} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="WhatsApp number" error={save.errors.callmebotPhone}>
-            <Input value={v.callmebotPhone} onChange={(e) => setV({ ...v, callmebotPhone: e.target.value })} disabled={!owner} />
+          <Field label="Bot token" error={save.errors.telegramBotToken}>
+            <Input value={v.telegramBotToken} onChange={(e) => setV({ ...v, telegramBotToken: e.target.value })} disabled={!owner} autoComplete="off" placeholder="123456789:AAH…" />
           </Field>
-          <Field label="CallMeBot API key" error={save.errors.callmebotApiKey}>
-            <Input value={v.callmebotApiKey} onChange={(e) => setV({ ...v, callmebotApiKey: e.target.value })} disabled={!owner} autoComplete="off" />
+          <Field label="Chat ids" hint="A group id covers everyone in it. Separate several with commas." error={save.errors.telegramChatIds}>
+            <Input value={v.telegramChatIds} onChange={(e) => setV({ ...v, telegramChatIds: e.target.value })} disabled={!owner} placeholder="-1001234567890" />
           </Field>
         </div>
+        {find.data &&
+          (find.data.chats.length ? (
+            <div className="flex flex-wrap gap-2">
+              {find.data.chats.map((c) => (
+                <Button key={c.id} variant="outline" size="sm" onClick={() => addChat(c.id)}>
+                  {c.title} · {c.id}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm">No chats yet. Send /start in the group (or to the bot) and try again within a day.</p>
+          ))}
         {owner && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={() => save.mutate(v)} disabled={save.isPending}>
               Save
             </Button>
-            <Button variant="outline" onClick={() => test.mutate()} disabled={test.isPending || !initial.callmebotApiKey}>
+            <Button variant="outline" onClick={() => find.mutate()} disabled={find.isPending || !initial.telegramBotToken}>
+              Find chats
+            </Button>
+            <Button variant="outline" onClick={() => test.mutate()} disabled={test.isPending || !initial.telegramBotToken || !initial.telegramChatIds}>
               Send test alert
             </Button>
           </div>

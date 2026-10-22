@@ -50,7 +50,7 @@ const titleId = `${id ?? 'categories'}-title`;
             const img = resolveImage(cover);
             return (
               <li data-reveal>
-                <a href={`/collections/${c.slug}/`} class="group relative block aspect-square overflow-hidden rounded-[14px] bg-purple-50">
+                <a href={`/collections/${c.slug}/`} class="group relative block aspect-square overflow-hidden rounded-[14px] bg-purple-50" data-reveal-media>
                   {img ? (
                     <Photo
                       src={img}

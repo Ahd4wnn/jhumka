@@ -1,53 +1,79 @@
 ---
 /**
- * Home banner: one wide photograph, with the headline and buttons underneath so nothing covers
- * the piece (and any text printed inside the photo is never cut or double-printed).
+ * Home hero, Apple-style: a centred stack (eyebrow, headline, tagline, meta, two pills) over one
+ * wide photograph. Motion lives in hero() in src/scripts/motion.ts: a first-visit veil
+ * (html.intro, set in BaseLayout's <head>), the text rise, and the frame widening on scroll.
  */
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
 import Photo from '@/components/Photo.astro';
 import MeshTile from '@/components/MeshTile.astro';
 import type { ResolvedImage } from '@/lib/images';
 
 interface Props {
   photo: ResolvedImage | null;
+  /** Optional 4:5 phone crop, served below 40rem. */
+  photoMobile?: ImageMetadata | null;
   photoAlt: string;
   photoClass?: string;
   eyebrow: string;
-  title: string;
+  /** Headline lines (HTML); each rises through its own mask. */
+  title: string[];
   sub: string;
+  meta?: string;
 }
-const { photo, photoAlt, photoClass, eyebrow, title, sub } = Astro.props;
+const { photo, photoMobile, photoAlt, photoClass, eyebrow, title, sub, meta } = Astro.props;
+const mobile = photoMobile ? await getImage({ src: photoMobile, widths: [480, 768, 1080, 1440], format: 'webp' }) : null;
+const imgProps = {
+  alt: photoAlt,
+  widths: [640, 960, 1280, 1920, 2400],
+  sizes: '100vw',
+  loading: 'eager' as const,
+  fetchpriority: 'high' as const,
+  class: ['absolute inset-0 size-full object-cover', photoClass].filter(Boolean).join(' '),
+};
 ---
 
-<section class="shell pt-4 pb-10 sm:pt-6 sm:pb-14" aria-labelledby="hero-title">
-  <div class="relative aspect-[4/5] overflow-hidden rounded-[18px] bg-purple-50 sm:aspect-[16/8]">
-    {
-      photo ? (
-        <Photo
-          src={photo}
-          alt={photoAlt}
-          widths={[640, 960, 1280, 1920, 2400]}
-          sizes="(min-width: 1600px) 90rem, 100vw"
-          loading="eager"
-          fetchpriority="high"
-          class:list={['absolute inset-0 size-full object-cover', photoClass]}
-        />
-      ) : (
-        <MeshTile seed="hero" tone="velvet" tall class="absolute inset-0" />
-      )
-    }
+<section class="hero bg-linear-to-b from-white to-purple-25 pt-12 pb-12 sm:pt-20 sm:pb-20" aria-labelledby="hero-title" data-hero>
+  <!-- First-visit intro (html.intro): velvet, the wordmark rising letter by letter, a glint of light, then the curtain lifts. -->
+  <div class="veil" aria-hidden="true" data-veil>
+    <div class="veil__glow"></div>
+    <div class="veil__mark display">
+      <span class="veil__word" data-veil-word>{[...'jhumka'].map((c) => <span class="veil__ch"><span>{c}</span></span>)}</span>
+      <span class="veil__word veil__sheen" data-veil-sheen>{[...'jhumka'].map((c) => <span class="veil__ch"><span>{c}</span></span>)}</span>
+    </div>
+    <p class="veil__tag caps" data-veil-tag>Handpicked jewellery</p>
   </div>
 
-  <div class="mt-8 flex flex-col gap-6 sm:mt-10 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
-    <div>
-      <p class="caps" data-reveal>{eyebrow}</p>
-      <h1 id="hero-title" class="display mt-4 text-[clamp(2.25rem,4.5vw,3.5rem)] leading-[1.05]" data-reveal>
-        <Fragment set:html={title} />
-      </h1>
-      <p class="mt-4 max-w-md text-[1.05rem]" data-reveal>{sub}</p>
+  <div class="shell flex flex-col items-center text-center" data-hero-copy>
+    <p class="caps" data-hero-fade>{eyebrow}</p>
+    <h1 id="hero-title" class="display mt-5 flex flex-wrap justify-center gap-x-[0.14em] text-[clamp(3rem,8.5vw,6rem)] leading-[0.95] tracking-[-0.03em]">
+      {title.map((line, i) => <>{i > 0 && ' '}<span class="hero-line"><span set:html={line} /></span></>)}
+    </h1>
+    <p class="mt-5 max-w-xl text-[clamp(1.05rem,1.6vw,1.35rem)] leading-snug" data-hero-fade>{sub}</p>
+    {meta && <p class="mt-2 text-sm tabular-nums" data-hero-fade>{meta}</p>}
+    <div class="mt-8 flex flex-wrap justify-center gap-3" data-hero-fade>
+      <a href="/shop" class="btn btn--pill btn--lg">Shop the collection</a>
+      <a href="#collections" class="btn btn--pill btn--outline btn--lg">Explore categories</a>
     </div>
-    <div class="flex flex-wrap gap-3 sm:pb-2" data-reveal>
-      <a href="/shop" class="btn btn--lg">Shop the collection</a>
-      <a href="#collections" class="btn btn--outline btn--lg">Browse categories</a>
+  </div>
+
+  <div class="hero-stage mt-10 sm:mt-14">
+    <div class="hero-frame" data-hero-frame>
+      <div class="absolute inset-0" data-hero-photo>
+        {
+          !photo ? (
+            <MeshTile seed="hero" tone="velvet" tall class="absolute inset-0" />
+          ) : mobile ? (
+            <picture class="contents">
+              <source media="(max-width: 39.99rem)" srcset={mobile.srcSet.attribute} sizes="100vw" type="image/webp" />
+              <Photo src={photo} {...imgProps} />
+            </picture>
+          ) : (
+            <Photo src={photo} {...imgProps} />
+          )
+        }
+      </div>
     </div>
   </div>
 </section>

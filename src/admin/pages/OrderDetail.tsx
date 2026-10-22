@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
-import { ArrowLeft, Copy, FileText } from 'lucide-react';
-import { get, post, type OrderStatus } from '../api';
-import { dateTime, fromPaise, inr, phone, STATUS, toPaise } from '../format';
+import { ArrowLeft, Copy, FileText, MessageCircle } from 'lucide-react';
+import { get, post, type OrderRow, type OrderStatus } from '../api';
+import { dateTime, fromPaise, inr, phone, shipMessage, STATUS, toPaise, waLink } from '../format';
 import { Button, Card, ErrorBox, Field, Input, Loading, Modal, PageHeader, StatusBadge, Tag, Textarea, useToast } from '../ui';
 import { mediaUrl } from '@/lib/media';
 
@@ -113,6 +113,11 @@ export function OrderDetail() {
         actions={
           <>
             {next.filter((s) => s !== 'cancelled').map(statusButton)}
+            {o.status === 'shipped' && (
+              <Button variant="outline" onClick={() => setShip(true)}>
+                <MessageCircle className="size-4" /> Message customer
+              </Button>
+            )}
             {o.invoiceNo && (
               <a href={`/api/admin/orders/${o.number}/invoice`} target="_blank" rel="noopener">
                 <Button variant="outline">
@@ -275,7 +280,7 @@ export function OrderDetail() {
         </div>
       </div>
 
-      <ShipModal open={ship} onClose={() => setShip(false)} initial={o} onSubmit={(v) => act.mutate({ action: 'status', to: 'shipped', ...v }, { onSuccess: () => setShip(false) })} busy={act.isPending} />
+      <ShipModal open={ship} onClose={() => setShip(false)} order={o} onSubmit={(v) => act.mutate({ action: 'status', to: 'shipped', ...v }, { onSuccess: () => setShip(false) })} busy={act.isPending} />
       <RefundModal
         open={refund}
         onClose={() => setRefund(false)}
@@ -287,27 +292,48 @@ export function OrderDetail() {
   );
 }
 
-function ShipModal({ open, onClose, initial, onSubmit, busy }: { open: boolean; onClose: () => void; initial: { courier: string | null; trackingNumber: string | null; trackingUrl: string | null }; onSubmit: (v: { courier: string; trackingNumber: string; trackingUrl: string | null }) => void; busy: boolean }) {
-  const [courier, setCourier] = useState(initial.courier ?? '');
-  const [trackingNumber, setTracking] = useState(initial.trackingNumber ?? '');
-  const [trackingUrl, setUrl] = useState(initial.trackingUrl ?? '');
+type ShipOrder = Pick<OrderRow, 'number' | 'name' | 'phone' | 'status' | 'courier' | 'trackingNumber' | 'trackingUrl' | 'customerLink'>;
+type ShipValues = { courier: string; trackingNumber: string; trackingUrl: string | null };
+
+export function ShipModal({ open, onClose, order, onSubmit, busy }: { open: boolean; onClose: () => void; order: ShipOrder; onSubmit: (v: ShipValues) => void; busy: boolean }) {
+  const [courier, setCourier] = useState(order.courier ?? '');
+  const [trackingNumber, setTracking] = useState(order.trackingNumber ?? '');
+  const [trackingUrl, setUrl] = useState(order.trackingUrl ?? '');
+  const shipped = order.status === 'shipped';
+  const v: ShipValues = { courier: courier.trim(), trackingNumber: trackingNumber.trim(), trackingUrl: trackingUrl.trim() || null };
+  // Re-sending unchanged details shouldn't re-stamp shippedAt or add another timeline entry.
+  const unchanged = shipped && v.courier === (order.courier ?? '') && v.trackingNumber === (order.trackingNumber ?? '') && v.trackingUrl === order.trackingUrl;
+  const message = () => {
+    // Opened synchronously inside the click so popup blockers allow it.
+    window.open(waLink(order.phone, shipMessage({ ...order, ...v }, location.origin)), '_blank', 'noopener');
+    if (unchanged) onClose();
+    else onSubmit(v);
+  };
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Mark as shipped"
+      title={shipped ? 'Message customer' : 'Mark as shipped'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={busy} onClick={() => onSubmit({ courier, trackingNumber, trackingUrl: trackingUrl || null })}>
-            Mark shipped
+          {!(shipped && unchanged) && (
+            <Button variant="outline" disabled={busy} onClick={() => onSubmit(v)}>
+              {shipped ? 'Save' : 'Mark shipped'}
+            </Button>
+          )}
+          <Button disabled={busy} onClick={message}>
+            <MessageCircle className="size-4" /> {shipped ? (unchanged ? 'Message customer' : 'Save & message customer') : 'Mark shipped & message customer'}
           </Button>
         </>
       }
     >
       <div className="grid gap-4">
+        <p className="text-sm">
+          {order.number} · {order.name}
+        </p>
         <Field label="Courier" hint="e.g. India Post, Delhivery, DTDC">
           <Input value={courier} onChange={(e) => setCourier(e.target.value)} list="couriers" />
           <datalist id="couriers">

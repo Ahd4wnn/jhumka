@@ -2,16 +2,20 @@ import type { APIRoute } from 'astro';
 import { z } from 'zod';
 import { requireAdmin, requireOwner } from '@/server/admin/guard';
 import { getSettings, saveSetting } from '@/server/settings';
-import { handle, json, readJson } from '@/server/http';
+import { handle, HttpError, json, readJson } from '@/server/http';
 
 export const GET: APIRoute = handle(async ({ locals }) => {
   const admin = requireAdmin(locals);
   const s = await getSettings();
-  // Staff can see store settings but never the alert API key. The Instagram token is never sent
+  // Staff can see store settings but never the alert keys. The Instagram token is never sent
   // to the browser at all (Admin → Settings → Instagram shows its status instead).
   const { instagram: _token, ...rest } = s;
-  return json({ settings: admin.role === 'owner' ? rest : { ...rest, alerts: { ...s.alerts, callmebotApiKey: s.alerts.callmebotApiKey ? '••••••' : '' } } });
+  const masked = { ...s.alerts, telegramBotToken: mask(s.alerts.telegramBotToken) };
+  return json({ settings: admin.role === 'owner' ? rest : { ...rest, alerts: masked } });
 });
+
+const MASK = '••••••';
+const mask = (secret: string) => (secret ? MASK : '');
 
 const paise = z.number().int().min(0).max(10_000_000);
 const body = z.discriminatedUnion('section', [
@@ -38,9 +42,15 @@ const body = z.discriminatedUnion('section', [
   z.object({
     section: z.literal('alerts'),
     value: z.object({
-      whatsappEnabled: z.boolean(),
-      callmebotPhone: z.string().trim().regex(/^\+?\d{10,15}$/, 'Use the full number with country code, e.g. +916238193133.'),
-      callmebotApiKey: z.string().trim().max(40),
+      telegramEnabled: z.boolean(),
+      telegramBotToken: z
+        .string()
+        .trim()
+        .regex(/^(\d{5,15}:[\w-]{30,60}|••••••)?$/, 'Paste the whole token from @BotFather, e.g. 123456789:AAH…'),
+      telegramChatIds: z
+        .string()
+        .trim()
+        .regex(/^(-?\d{3,20}([\s,]+-?\d{3,20})*)?$/, 'Chat ids are numbers (groups start with -), separated by commas.'),
     }),
   }),
   z.object({ section: z.literal('reviews'), value: z.object({ autoPublish: z.boolean() }) }),
@@ -49,8 +59,12 @@ const body = z.discriminatedUnion('section', [
 export const PUT: APIRoute = handle(async ({ locals, request }) => {
   requireOwner(locals);
   const input = await readJson(request, body);
-  if (input.section === 'alerts' && input.value.callmebotApiKey === '••••••') {
-    input.value.callmebotApiKey = (await getSettings()).alerts.callmebotApiKey;
+  if (input.section === 'alerts') {
+    const saved = (await getSettings()).alerts;
+    if (input.value.telegramBotToken === MASK) input.value.telegramBotToken = saved.telegramBotToken;
+    if (input.value.telegramEnabled && !(input.value.telegramBotToken && input.value.telegramChatIds)) {
+      throw new HttpError(400, 'Add the bot token and at least one chat id before turning Telegram alerts on.');
+    }
   }
   await saveSetting(input.section, input.value as never);
   return json({ settings: await getSettings() });

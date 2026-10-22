@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
-import { Download, LayoutList, Columns3 } from 'lucide-react';
-import { get, type OrderRow, type OrderStatus } from '../api';
+import { Download, LayoutList, Columns3, MessageCircle, Truck } from 'lucide-react';
+import { get, post, type OrderRow, type OrderStatus } from '../api';
 import { ago, inr, phone, STATUS } from '../format';
-import { Button, cx, Empty, ErrorBox, Input, Loading, PageHeader, StatusBadge, td, th } from '../ui';
+import { Button, cx, Empty, ErrorBox, Input, Loading, PageHeader, StatusBadge, td, th, useToast } from '../ui';
+import { ShipModal } from './OrderDetail';
 
 interface List {
   orders: OrderRow[];
@@ -35,6 +36,18 @@ export function Orders() {
 
   const qs = new URLSearchParams({ status: view === 'board' ? 'all' : status, page: String(page), ...(params.get('q') ? { q: params.get('q')! } : {}) });
   const list = useQuery({ queryKey: ['orders', qs.toString()], queryFn: () => get<List>(`/orders?${qs}`), placeholderData: keepPreviousData, refetchInterval: 30_000 });
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [shipping, setShipping] = useState<OrderRow | null>(null);
+  const ship = useMutation({
+    mutationFn: (body: Record<string, unknown>) => post(`/orders/${shipping!.number}/actions`, { action: 'status', to: 'shipped', ...body }),
+    onSuccess: () => {
+      setShipping(null);
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (e) => toast(e.message),
+  });
 
   const set = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -133,7 +146,7 @@ export function Orders() {
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-sm">
+            <table className="w-full min-w-[52rem] text-sm">
               <thead className="border-b border-purple-200">
                 <tr>
                   <th className={th}>Order</th>
@@ -143,6 +156,9 @@ export function Orders() {
                   <th className={th}>Status</th>
                   <th className={`${th} text-right`}>Total</th>
                   <th className={`${th} text-right`}>Placed</th>
+                  <th className={th}>
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-purple-100">
@@ -164,6 +180,18 @@ export function Orders() {
                     </td>
                     <td className={`${td} text-right tabular-nums`}>{inr(o.totalPaise)}</td>
                     <td className={`${td} text-right text-xs`}>{ago(o.paidAt ?? o.createdAt)}</td>
+                    <td className={`${td} text-right`}>
+                      {(o.status === 'paid' || o.status === 'packed') && (
+                        <Button variant="outline" size="sm" onClick={() => setShipping(o)}>
+                          <Truck className="size-3.5" /> Ship
+                        </Button>
+                      )}
+                      {o.status === 'shipped' && (
+                        <Button variant="ghost" size="sm" onClick={() => setShipping(o)}>
+                          <MessageCircle className="size-3.5" /> Message
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -182,6 +210,7 @@ export function Orders() {
           )}
         </>
       )}
+      {shipping && <ShipModal key={shipping.id} open onClose={() => setShipping(null)} order={shipping} onSubmit={(v) => ship.mutate(v)} busy={ship.isPending} />}
     </>
   );
 }

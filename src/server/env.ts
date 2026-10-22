@@ -22,8 +22,13 @@ const schema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
-  CALLMEBOT_PHONE: z.string().optional(),
-  CALLMEBOT_APIKEY: z.string().optional(),
+  // Customer receipts (src/server/notify/email.ts); unset = no receipts.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
+  MAIL_REPLY_TO: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

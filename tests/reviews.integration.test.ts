@@ -12,7 +12,7 @@ import { changeStatus, createCheckout, markOrderPaid, type Order } from '@/serve
 import { setRazorpayGateway } from '@/server/commerce/razorpay';
 import { deleteMedia, mediaFilePath } from '@/server/media';
 import { displayName, productReviews, submitReview, type ReviewInput } from '@/server/reviews';
-import { saveSetting } from '@/server/settings';
+import { DEFAULT_SETTINGS, saveSetting } from '@/server/settings';
 import { invalidateCatalog, getProduct } from '@/lib/catalog';
 import { existsSync } from 'node:fs';
 
@@ -48,10 +48,11 @@ describe.skipIf(!hasDatabase())('customer reviews', () => {
       ])
       .returning({ id: products.id, slug: products.slug });
     [necklace, bracelet, notBought] = rows.map((r) => r.id);
-    await saveSetting('alerts', { whatsappEnabled: false, callmebotPhone: '+916238193133', callmebotApiKey: '' });
+    await saveSetting('alerts', DEFAULT_SETTINGS.alerts);
     setRazorpayGateway({
       createOrder: async ({ amount }) => ({ id: `order_R${++n}`, amount, currency: 'INR' }),
       fetchPayment: async (id) => ({ id, method: 'upi' }),
+      fetchOrderPayments: async () => [],
       refund: async (_, { amount }) => ({ id: 'rfnd', amount }),
     });
     ({ order } = await createCheckout({

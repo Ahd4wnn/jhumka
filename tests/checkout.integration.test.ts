@@ -8,14 +8,18 @@ import { eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { getDb, getSql, hasDatabase } from '@/server/db/client';
 import { collections, coupons, customers, notifications, orders, products } from '@/server/db/schema';
-import { changeStatus, createCheckout, markOrderPaid, refundOrder } from '@/server/commerce/orders';
+import { changeStatus, createCheckout, markOrderPaid, reconcilePending, refundOrder } from '@/server/commerce/orders';
 import { setRazorpayGateway, verifyPaymentSignature } from '@/server/commerce/razorpay';
-import { saveSetting } from '@/server/settings';
+import { DEFAULT_SETTINGS, saveSetting } from '@/server/settings';
+import { env } from '@/server/env';
+import { checkoutRequest } from '@/server/commerce/schemas';
 import { dashboard, report } from '@/server/admin/reports';
 
 const SECRET = 'integration_secret';
 let rzpCounter = 0;
 const refunds: { paymentId: string; amount: number }[] = [];
+/** Payments the fake Razorpay reports per order, for the reconcile job. */
+const captured = new Map<string, { id: string; method: string; status: string }[]>();
 
 const address = { name: 'Priya S', phone: '+919876543210', line1: '12 MG Road', city: 'Kochi', state: 'Kerala', pincode: '682001' };
 const checkout = (items: { slug: string; qty: number }[], couponCode?: string) =>
@@ -39,13 +43,16 @@ describe.skipIf(!hasDatabase())('checkout → payment → fulfilment', () => {
     ]);
     await db.insert(coupons).values({ code: 'WELCOME10', type: 'percent', value: 10, minOrderPaise: 0 });
     await saveSetting('shipping', { flatPaise: 6_000, freeAbovePaise: 100_000 });
-    await saveSetting('alerts', { whatsappEnabled: true, callmebotPhone: '+916238193133', callmebotApiKey: 'test' });
+    await saveSetting('alerts', { ...DEFAULT_SETTINGS.alerts, telegramEnabled: true, telegramBotToken: '1:x', telegramChatIds: '-1001' });
     const [admin] = (await db.execute(sql`insert into admin_users (email, name, password_hash, role) values ('owner@test', 'Owner', 'x', 'owner') returning id`)) as unknown as [{ id: string }];
     adminId = admin.id;
+    // Ignore any real SMTP settings in .env: receipts are switched on only by the test that checks them.
+    Object.assign(env, { SMTP_HOST: undefined, SMTP_USER: undefined, SMTP_PASS: undefined, MAIL_FROM: undefined });
 
     setRazorpayGateway({
       createOrder: async ({ amount }) => ({ id: `order_T${++rzpCounter}`, amount, currency: 'INR' }),
       fetchPayment: async (id) => ({ id, method: 'upi' }),
+      fetchOrderPayments: async (orderId) => captured.get(orderId) ?? [],
       refund: async (paymentId, { amount }) => (refunds.push({ paymentId, amount }), { id: `rfnd_${refunds.length}`, amount }),
     });
   });
@@ -130,5 +137,81 @@ describe.skipIf(!hasDatabase())('checkout → payment → fulfilment', () => {
     const full = await refundOrder(order.id, order.totalPaise - 10_000, adminId);
     expect(full.status).toBe('refunded');
     expect(refunds.map((r) => r.amount)).toEqual([10_000, order.totalPaise - 10_000]);
+  });
+
+  const totals = async () => (await getDb().select().from(customers).where(eq(customers.phone, '+919876543210')))[0];
+
+  it('lets only one of two simultaneous full refunds through', async () => {
+    const { order } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    await markOrderPaid({ razorpayOrderId: order.razorpayOrderId!, paymentId: 'pay_3', source: 'webhook' });
+    const before = refunds.length;
+    const results = await Promise.allSettled([refundOrder(order.id, order.totalPaise, adminId), refundOrder(order.id, order.totalPaise, adminId)]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(refunds.length - before).toBe(1);
+  });
+
+  it('takes a cancelled order out of the customer totals once, even after a full refund', async () => {
+    const start = await totals();
+    const { order: keep } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    const { order: cancel } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    await markOrderPaid({ razorpayOrderId: keep.razorpayOrderId!, paymentId: 'pay_4', source: 'webhook' });
+    await markOrderPaid({ razorpayOrderId: cancel.razorpayOrderId!, paymentId: 'pay_5', source: 'webhook' });
+    await changeStatus(cancel.id, 'cancelled', adminId);
+    await refundOrder(cancel.id, cancel.totalPaise, adminId);
+    expect(await totals()).toMatchObject({ ordersCount: start.ordersCount + 1, totalSpentPaise: start.totalSpentPaise + keep.totalPaise });
+  });
+
+  it('keeps a payment that arrives after the order was cancelled, alerts the owner, and allows a refund', async () => {
+    const db = getDb();
+    const { order } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    await changeStatus(order.id, 'cancelled', adminId);
+    const start = await totals();
+    const late = await markOrderPaid({ razorpayOrderId: order.razorpayOrderId!, paymentId: 'pay_6', source: 'webhook' });
+    expect(late.changed).toBe(false);
+    expect(late.order).toMatchObject({ status: 'cancelled', razorpayPaymentId: 'pay_6' });
+    const alerts = await db.select().from(notifications).where(eq(notifications.orderId, order.id));
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].body).toContain('cancelled');
+    expect((await refundOrder(order.id, order.totalPaise, adminId)).status).toBe('refunded');
+    expect(await totals()).toMatchObject({ ordersCount: start.ordersCount, totalSpentPaise: start.totalSpentPaise });
+  });
+
+  it('marks an order paid when Razorpay has the payment but no callback or webhook arrived', async () => {
+    const db = getDb();
+    const { order } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    captured.set(order.razorpayOrderId!, [{ id: 'pay_failed', method: 'card', status: 'failed' }, { id: 'pay_7', method: 'upi', status: 'captured' }]);
+    expect(await reconcilePending()).toBe(1);
+    const [paid] = await db.select().from(orders).where(eq(orders.id, order.id));
+    expect(paid).toMatchObject({ status: 'paid', razorpayPaymentId: 'pay_7', paymentMethod: 'upi' });
+    expect(await reconcilePending()).toBe(0);
+  });
+
+  it('sends the order alert to every Telegram chat once', async () => {
+    const db = getDb();
+    await saveSetting('alerts', { ...DEFAULT_SETTINGS.alerts, telegramEnabled: true, telegramBotToken: '1:x', telegramChatIds: '-1001, 42, -1001' });
+    const { order } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+    await markOrderPaid({ razorpayOrderId: order.razorpayOrderId!, paymentId: 'pay_8', source: 'webhook' });
+    const rows = await db.select().from(notifications).where(eq(notifications.orderId, order.id));
+    expect(rows.map((r) => `${r.channel}:${r.recipient}`).sort()).toEqual(['telegram:-1001', 'telegram:42']);
+  });
+
+  it('queues a receipt email for the customer when email is set up', async () => {
+    const db = getDb();
+    Object.assign(env, { SMTP_HOST: 'smtp.test', SMTP_USER: 'u', SMTP_PASS: 'p', MAIL_FROM: 'Jhumka <orders@test>' });
+    try {
+      const { order } = await checkout([{ slug: 'tulip-necklace', qty: 1 }]);
+      await markOrderPaid({ razorpayOrderId: order.razorpayOrderId!, paymentId: 'pay_9', source: 'webhook' });
+      const rows = await db.select().from(notifications).where(eq(notifications.orderId, order.id));
+      expect(rows.filter((r) => r.channel === 'email').map((r) => r.recipient)).toEqual(['priya@example.com']);
+    } finally {
+      Object.assign(env, { SMTP_HOST: undefined, SMTP_USER: undefined, SMTP_PASS: undefined, MAIL_FROM: undefined });
+    }
+  });
+
+  it('requires an email at checkout', () => {
+    const base = { items: [{ slug: 'tulip-necklace', qty: 1 }], name: 'Priya S', phone: '9876543210', address: { line1: '12 MG Road', city: 'Kochi', state: 'Kerala', pincode: '682001' } };
+    expect(checkoutRequest.safeParse(base).success).toBe(false);
+    expect(checkoutRequest.safeParse({ ...base, email: 'not-an-email' }).success).toBe(false);
+    expect(checkoutRequest.safeParse({ ...base, email: ' Priya@Example.com ' }).data?.email).toBe('priya@example.com');
   });
 });

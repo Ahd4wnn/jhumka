@@ -27,7 +27,7 @@ const paths: Record<string, string> = {
   <ul class="shell grid grid-cols-2 gap-x-6 gap-y-5 py-6 lg:grid-cols-4 lg:py-7">
     {
       items.map((it) => (
-        <li class="flex items-start gap-3">
+        <li class="flex items-start gap-3" data-reveal>
           <svg viewBox="0 0 24 24" class="mt-0.5 size-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
             <path d={paths[it.icon]} />
           </svg>

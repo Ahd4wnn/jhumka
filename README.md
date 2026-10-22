@@ -8,7 +8,7 @@ checkout, and an admin with a CRM — one Node server on your own PostgreSQL.
 - **Checkout** — guest checkout, prices always recalculated on the server, Razorpay (UPI, cards, net banking, wallets), webhook backup, order tracking.
 - **Admin + CRM** (`/admin`) — dashboard, orders pipeline (packed → shipped → delivered), refunds, invoice PDFs, customers with notes/tags/follow-ups, abandoned checkouts, review moderation with public replies, coupons, reports + CSV, settings, team.
 - **Instagram feed** — the home page shows the latest posts from @jhumka.in_ via the official Instagram API (no scraping). Images are copied to /media every 30 min; the token renews itself weekly. Connect in Admin → Settings → Instagram feed.
-- **Owner alerts** — free WhatsApp message per paid order (CallMeBot) + live pop-up and chime in the admin.
+- **Owner alerts** — a Telegram message per paid order to the founders' group + live pop-up and chime in the admin.
 - **Data** — PostgreSQL 18 via Drizzle ORM (`src/server/db/schema.ts`, migrations in `drizzle/`). Money is stored in paise.
 
 ## Run it on this PC (Windows)
@@ -59,7 +59,7 @@ src/admin/            admin + CRM React app (pages/, ui.tsx, api.ts)
 src/server/           server-only code
   db/                 schema + connection
   commerce/           pricing, cart, orders (markOrderPaid), Razorpay, status rules
-  notify/             owner alerts: outbox + CallMeBot + live events
+  notify/             owner alerts: outbox + Telegram + live events
   admin/              admin guards, validation, reports
   media.ts            photo processing (AVIF/WebP, 480/960/1600 px)
   invoice.ts          invoice PDFs (GST-ready)
@@ -71,7 +71,7 @@ tests/                vitest unit + integration tests
 ## Going live
 
 Follow [docs/DEPLOY.md](docs/DEPLOY.md) — Ubuntu VPS, PostgreSQL, Caddy HTTPS, systemd, nightly
-backups, Razorpay live keys + webhook, CallMeBot activation.
+backups, Razorpay live keys + webhook, Telegram alerts.
 
 ## Before launch checklist
 
@@ -80,7 +80,7 @@ backups, Razorpay live keys + webhook, CallMeBot activation.
 - [ ] `npm run verify -- https://your-domain` passes against the live site
 - [ ] Shipping fee / free-shipping threshold in Admin → Settings
 - [ ] Business address in Admin → Settings (appears on invoices)
-- [ ] CallMeBot activated and **Send test alert** received
+- [ ] Telegram bot connected and **Send test alert** received in the founders' group
 - [ ] Instagram connected in Admin → Settings → Instagram feed (hero image: replace the file in `src/assets/hero/` to change it)
 - [ ] Razorpay live keys + webhook, one real payment tested and refunded
 - [ ] `PUBLIC_SITE_URL` set to the final domain

@@ -209,6 +209,14 @@ function init() {
         image: new URL('/favicon.svg', location.origin).toString(),
         prefill: p.prefill,
         theme: { color: '#7D46AB' },
+        // UPI first (GPay, PhonePe, Paytm… or a QR code); cards, net banking and wallets follow.
+        config: {
+          display: {
+            blocks: { upi: { name: 'Pay with UPI', instruments: [{ method: 'upi' }] } },
+            sequence: ['block.upi'],
+            preferences: { show_default_blocks: true },
+          },
+        },
         handler: async (r: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
           payBtn.textContent = 'Confirming your payment…';
           try {

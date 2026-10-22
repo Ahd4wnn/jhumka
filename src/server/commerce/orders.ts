@@ -3,17 +3,17 @@
  * checkout callback and the Razorpay webhook, failures, admin status changes and refunds.
  */
 import { randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
 import { invalidateCatalog } from '@/lib/catalog';
 import { getDb, type DB } from '../db/client';
 import { coupons, customers, orderEvents, orderItems, orders, products, type Address } from '../db/schema';
 import { HttpError } from '../http';
-import { notifyNewOrder } from '../notify';
+import { notifyLatePayment, notifyNewOrder } from '../notify';
 import { getSettings } from '../settings';
 import { priceCart, type CartInput, type CartIssue } from './cart';
 import { computeTotals, couponDiscount, MIN_ORDER_PAISE, type CouponRule } from './pricing';
 import { getRazorpay } from './razorpay';
-import { canTransition, type OrderStatus } from './status';
+import { canTransition, SALE_STATUSES, type OrderStatus } from './status';
 
 export type Order = typeof orders.$inferSelect;
 
@@ -136,11 +136,24 @@ export interface PaidResult {
  * The single path to "paid". Idempotent: the checkout callback and the webhook may both call
  * it, in any order, any number of times — stock, coupons and alerts are only applied once.
  */
-export async function markOrderPaid(args: { razorpayOrderId: string; paymentId: string; signature?: string; method?: string; source: 'checkout' | 'webhook' }): Promise<PaidResult> {
+export async function markOrderPaid(args: { razorpayOrderId: string; paymentId: string; signature?: string; method?: string; source: 'checkout' | 'webhook' | 'reconcile' }): Promise<PaidResult> {
   const db = getDb();
   const result = await db.transaction(async (tx) => {
     const [order] = await tx.select().from(orders).where(eq(orders.razorpayOrderId, args.razorpayOrderId)).for('update');
     if (!order) throw new HttpError(404, 'Order not found for this payment.');
+    if (order.status === 'cancelled' && !order.razorpayPaymentId) {
+      // Paid after it was cancelled (e.g. a payment page left open): keep the payment so the owner can refund it.
+      const [kept] = await tx
+        .update(orders)
+        .set({ paidAt: new Date(), razorpayPaymentId: args.paymentId, paymentMethod: args.method ?? order.paymentMethod })
+        .where(eq(orders.id, order.id))
+        .returning();
+      await addEvent(tx as unknown as DB, order.id, 'payment', `Payment received after the order was cancelled (${args.source}). Refund it, or contact the customer.`, {
+        paymentId: args.paymentId,
+        method: args.method ?? null,
+      });
+      return { order: kept, changed: false, late: true };
+    }
     if (order.status !== 'pending_payment' && order.status !== 'payment_failed') return { order, changed: false };
 
     // Take the pieces out of stock. If another buyer paid for the last one first, flag it for the owner.
@@ -203,6 +216,7 @@ export async function markOrderPaid(args: { razorpayOrderId: string; paymentId: 
     invalidateCatalog();
     await notifyNewOrder(result.order).catch((err) => console.error('[notify]', err));
   }
+  if (result.late) await notifyLatePayment(result.order).catch((err) => console.error('[notify]', err));
   return result;
 }
 
@@ -276,28 +290,65 @@ export async function changeStatus(
 
 /** Full or partial refund through Razorpay. Fully refunded orders move to "refunded". */
 export async function refundOrder(orderId: string, amountPaise: number, actorId: string, reason?: string): Promise<Order> {
-  const db = getDb();
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
-  if (!order) throw new HttpError(404, 'Order not found.');
-  if (!order.razorpayPaymentId || !order.paidAt) throw new HttpError(409, 'Only paid orders can be refunded.');
-  const refundable = order.totalPaise - order.refundedPaise;
-  if (amountPaise <= 0 || amountPaise > refundable) throw new HttpError(400, `You can refund up to ₹${(refundable / 100).toFixed(2)}.`);
+  // The order row stays locked from the amount check to the update, so a double-clicked or
+  // simultaneous refund waits here and is then checked against the first one's amount.
+  return getDb().transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
+    if (!order) throw new HttpError(404, 'Order not found.');
+    if (!order.razorpayPaymentId || !order.paidAt) throw new HttpError(409, 'Only paid orders can be refunded.');
+    const refundable = order.totalPaise - order.refundedPaise;
+    if (amountPaise <= 0 || amountPaise > refundable) throw new HttpError(400, `You can refund up to ₹${(refundable / 100).toFixed(2)}.`);
 
-  const refund = await getRazorpay().refund(order.razorpayPaymentId, { amount: amountPaise, notes: { order_number: order.number, reason: reason ?? '' } });
-  const full = order.refundedPaise + amountPaise >= order.totalPaise;
-  const [updated] = await db
-    .update(orders)
-    .set({ refundedPaise: order.refundedPaise + amountPaise, ...(full ? { status: 'refunded' as const } : {}) })
-    .where(eq(orders.id, orderId))
-    .returning();
-  await addEvent(db, orderId, 'refund', `Refunded ₹${(amountPaise / 100).toFixed(2)}${full ? ' (full)' : ''}${reason ? ` · ${reason}` : ''}`, { refundId: refund.id }, actorId);
-  if (full && order.customerId) {
-    await db
-      .update(customers)
-      .set({ ordersCount: sql`greatest(${customers.ordersCount} - 1, 0)`, totalSpentPaise: sql`greatest(${customers.totalSpentPaise} - ${order.totalPaise}, 0)` })
-      .where(eq(customers.id, order.customerId));
+    const refund = await getRazorpay().refund(order.razorpayPaymentId, { amount: amountPaise, notes: { order_number: order.number, reason: reason ?? '' } });
+    // ponytail: if the save below failed after Razorpay accepted, the refund is only visible via the
+    // refund.processed webhook event in the order timeline; fine at this volume.
+    const full = order.refundedPaise + amountPaise >= order.totalPaise;
+    const [updated] = await tx
+      .update(orders)
+      .set({ refundedPaise: order.refundedPaise + amountPaise, ...(full ? { status: 'refunded' as const } : {}) })
+      .where(eq(orders.id, orderId))
+      .returning();
+    await addEvent(tx as unknown as DB, orderId, 'refund', `Refunded ₹${(amountPaise / 100).toFixed(2)}${full ? ' (full)' : ''}${reason ? ` · ${reason}` : ''}`, { refundId: refund.id }, actorId);
+    // Only a live sale is in the customer's totals: a cancelled order was already taken out.
+    if (full && order.customerId && SALE_STATUSES.includes(order.status)) {
+      await tx
+        .update(customers)
+        .set({ ordersCount: sql`greatest(${customers.ordersCount} - 1, 0)`, totalSpentPaise: sql`greatest(${customers.totalSpentPaise} - ${order.totalPaise}, 0)` })
+        .where(eq(customers.id, order.customerId));
+    }
+    return updated;
+  });
+}
+
+/**
+ * Safety net for "paid but the order still says unpaid": asks Razorpay about recent unpaid orders
+ * and marks any with a captured payment as paid. Covers a closed tab plus a missing or broken webhook.
+ */
+export async function reconcilePending(limit = 20): Promise<number> {
+  const unpaid = await getDb()
+    .select({ razorpayOrderId: orders.razorpayOrderId })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.status, ['pending_payment', 'payment_failed']),
+        isNotNull(orders.razorpayOrderId),
+        gt(orders.createdAt, new Date(Date.now() - 3 * 86_400_000)),
+      ),
+    )
+    .orderBy(orders.createdAt)
+    .limit(limit);
+  let paid = 0;
+  for (const { razorpayOrderId } of unpaid) {
+    // One bad order (e.g. a test-mode id after switching to live keys) must not block the rest.
+    const payments = await getRazorpay()
+      .fetchOrderPayments(razorpayOrderId!)
+      .catch((err) => (console.error('[reconcile]', razorpayOrderId, err), []));
+    const captured = payments.find((p) => p.status === 'captured');
+    if (!captured) continue;
+    const r = await markOrderPaid({ razorpayOrderId: razorpayOrderId!, paymentId: captured.id, method: captured.method, source: 'reconcile' });
+    if (r.changed) paid++;
   }
-  return updated;
+  return paid;
 }
 
 export { addEvent };

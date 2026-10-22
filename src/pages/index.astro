@@ -14,6 +14,7 @@ import { heroImage, lifestylePhotos, resolveImage, type ResolvedImage } from '@/
 import { cachePublicPage } from '@/server/http';
 import { faqLd, itemListLd, organizationLd, websiteLd } from '@/lib/seo';
 import { SITE } from '@/config/site';
+import { formatINR } from '@/lib/format';
 
 const [collections, products, featured] = await Promise.all([getCollections(), getProducts(), getFeaturedProducts(8)]);
 const site = Astro.site!;
@@ -25,6 +26,8 @@ const productPhotos = products.flatMap((p) => p.images.map((im) => resolveImage(
 const pool = [...lifestyle, ...productPhotos];
 const hero = heroImage();
 const heroPhoto = hero ?? pool[0] ?? null;
+const livePrices = products.filter((p) => p.price_inr != null && p.stock_status !== 'sold_out').map((p) => p.price_inr!);
+const heroMeta = [livePrices.length > 0 && `From ${formatINR(Math.min(...livePrices))}`, 'Ships across India'].filter(Boolean).join(' · ');
 const storyPhoto = (hero ? pool[0] : (pool[1] ?? pool[0])) ?? null;
 // Link previews (WhatsApp, Instagram, Google) show the hero banner.
 const ogImage = hero ? (await getImage({ src: hero, width: 1200, format: 'jpg' })).src : undefined;
@@ -38,18 +41,17 @@ const newestOnly = newest.filter((p) => !bestSellers.some((b) => b.id === p.id))
 <BaseLayout
   description={SITE.description}
   image={ogImage}
-  imageAlt="Jhumka necklaces on purple velvet busts: Heartfelt Elegance"
+  imageAlt="Jhumka gold-plated necklaces on purple velvet busts"
   jsonLd={[organizationLd(site), websiteLd(site), faqLd(), itemListLd(site, 'Featured jewellery', featured)]}
 >
   <Banner
     photo={heroPhoto}
-    photoAlt={hero
-      ? 'Four Jhumka gold-plated necklaces on purple velvet busts, with the words Heartfelt Elegance: necklaces that speak the language of your heart'
-      : 'Jhumka jewellery'}
-    photoClass={hero ? 'object-[62%_18%]' : undefined}
-    eyebrow="Handpicked jewellery"
-    title="Your story, <span class='accent'>styled by</span> Jhumka"
+    photoMobile={heroImage('mobile')}
+    photoAlt={hero ? 'Four Jhumka gold-plated necklaces, a heart, an infinity, a butterfly and a tulip, on purple velvet busts' : 'Jhumka jewellery'}
+    eyebrow="New · Heartfelt Elegance"
+    title={['Your story,', "<span class='accent'>styled.</span>"]}
     sub={SITE.bio}
+    meta={heroMeta}
   />
   <TrustStrip />
   <CategoryTiles id="collections" collections={collections} products={products} title="Shop by category" sub="Necklaces, bracelets and everyday pieces, grouped the way you wear them." />
